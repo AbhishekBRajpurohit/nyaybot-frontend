@@ -1,115 +1,732 @@
-import React, { useState, useEffect } from "react";
-import { FileText, Scale, ShieldAlert, Users, Play, ArrowRight } from "lucide-react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import {
+  Paperclip,
+  Mic,
+  MicOff,
+  Send,
+  X,
+  Camera,
+  ArrowLeft,
+  FileText,
+  Upload,
+  Users,
+  Image,
+  FolderOpen,
+  Loader2,
+} from "lucide-react";
+import { t } from "../i18n";
 
-const TYPING_PHRASES = [
-  "Mera bail ho sakta hai?",
-  "What are my rights?",
-  "How long can they hold me?",
-  "Find me a lawyer nearby.",
-];
-
-export default function Hero({ onAnalyzeClick }) {
-  // Typing Animation State
-  const [typedText, setTypedText] = useState("");
-  const [phraseIdx, setPhraseIdx] = useState(0);
-  const [charIdx, setCharIdx] = useState(0);
-  const [deleting, setDeleting] = useState(false);
-
-  // Typing Animation Effect
-  useEffect(() => {
-    const phrase = TYPING_PHRASES[phraseIdx];
-    let timeout;
-    if (!deleting && charIdx < phrase.length) {
-      timeout = setTimeout(() => setCharIdx((c) => c + 1), 60);
-    } else if (!deleting && charIdx === phrase.length) {
-      timeout = setTimeout(() => setDeleting(true), 1800);
-    } else if (deleting && charIdx > 0) {
-      timeout = setTimeout(() => setCharIdx((c) => c - 1), 35);
-    } else if (deleting && charIdx === 0) {
-      setDeleting(false);
-      setPhraseIdx((i) => (i + 1) % TYPING_PHRASES.length);
-    }
-    setTypedText(phrase.substring(0, charIdx));
-    return () => clearTimeout(timeout);
-  }, [charIdx, deleting, phraseIdx]);
-
-  const cards = [
-    { icon: <FileText size={28} />, title: "FIR Analysis" },
-    { icon: <Scale size={28} />, title: "Bail Probability" },
-    { icon: <ShieldAlert size={28} />, title: "Detention Alert" },
-    { icon: <Users size={28} />, title: "Local Lawyers" }
-  ];
-
+// ─── Attach Menu ────────────────────────────────────────────────────────────
+const AttachMenu = React.forwardRef(function AttachMenu(
+  { onCamera, onGallery, onDocument, lang },
+  ref
+) {
   return (
-    <div className="bg-[#0d1225]">
-      {/* UPDATED: Changed the background URL to your new image */}
-      <header className="relative bg-[url('/hero-justice.jpg')] bg-cover bg-center bg-no-repeat text-white overflow-hidden pb-32">
-        
-        {/* UPDATED: Gradient Overlay. Dark at top for text, lighter at bottom for the golden glow */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0d1225]/90 via-[#0d1225]/75 to-[#0d1225]/40 backdrop-blur-[1px]"></div>
+    <div
+      ref={ref}
+      className="absolute bottom-full left-0 mb-2 w-52 bg-[#1a1f2e] border border-white/12 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden z-50"
+    >
+      <button
+        onClick={onCamera}
+        className="w-full flex items-center gap-3 px-4 py-3.5 text-sm text-slate-200 hover:bg-yellow-500/10 hover:text-yellow-300 transition-all group"
+      >
+        <div className="w-8 h-8 rounded-xl bg-yellow-500/15 border border-yellow-500/25 flex items-center justify-center group-hover:bg-yellow-500/25 transition-all">
+          <Camera size={15} className="text-yellow-400" />
+        </div>
+        <span className="font-semibold">{t(lang, "attach_camera")}</span>
+      </button>
+      <div className="h-px bg-white/6 mx-4" />
+      <button
+        onClick={onGallery}
+        className="w-full flex items-center gap-3 px-4 py-3.5 text-sm text-slate-200 hover:bg-yellow-500/10 hover:text-yellow-300 transition-all group"
+      >
+        <div className="w-8 h-8 rounded-xl bg-yellow-500/15 border border-yellow-500/25 flex items-center justify-center group-hover:bg-yellow-500/25 transition-all">
+          <Image size={15} className="text-yellow-400" />
+        </div>
+        <span className="font-semibold">{t(lang, "attach_gallery")}</span>
+      </button>
+      <div className="h-px bg-white/6 mx-4" />
+      <button
+        onClick={onDocument}
+        className="w-full flex items-center gap-3 px-4 py-3.5 text-sm text-slate-200 hover:bg-yellow-500/10 hover:text-yellow-300 transition-all group"
+      >
+        <div className="w-8 h-8 rounded-xl bg-yellow-500/15 border border-yellow-500/25 flex items-center justify-center group-hover:bg-yellow-500/25 transition-all">
+          <FolderOpen size={15} className="text-yellow-400" />
+        </div>
+        <span className="font-semibold">{t(lang, "attach_document")}</span>
+      </button>
+    </div>
+  );
+});
 
-        {/* Hero Content */}
-        <div className="relative z-10 flex flex-col items-center text-center pt-40 px-4 max-w-5xl mx-auto">
-          
-          {/* Top Pill */}
-          <div className="border border-slate-500/50 bg-slate-800/60 backdrop-blur-md rounded-full px-4 py-1.5 mb-8 text-xs text-slate-200 flex items-center space-x-2">
-            <Scale size={14} className="text-yellow-500" />
-            <span>Justice, made understandable.</span>
-          </div>
-          
-          <h1 className="text-5xl md:text-7xl font-serif font-bold leading-tight mb-6 max-w-4xl text-white tracking-tight drop-shadow-lg">
-            AI Legal Assistant <br /> for Every Citizen
-          </h1>
-          
-          <p className="text-lg text-slate-200 max-w-2xl mb-10 leading-relaxed font-light drop-shadow-md">
-            Speak, type, or upload your FIR. NyayBot explains your rights, predicts 
-            bail probability, and finds a lawyer near you — in your language.
-          </p>
+// ─── Groq API Call ─────────────────────────────────────────────────────────
+async function callGroq({ text, images }) {
+  const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 
-          {/* Typewriter Input Mockup */}
-          <div className="w-full max-w-xl bg-white/5 border border-white/20 rounded-2xl p-1.5 mb-10 backdrop-blur-md shadow-2xl">
-            <div className="flex items-center gap-3 px-4 py-3 bg-[#0d1225]/90 rounded-xl border border-white/5">
-              <Scale size={20} className="text-yellow-500" />
-              <span className="text-slate-200 text-base flex-1 text-left font-medium">
-                {typedText}
-                <span className="inline-block w-0.5 h-5 bg-yellow-500 ml-1 translate-y-1 animate-pulse" />
-              </span>
-              <button 
-                onClick={onAnalyzeClick}
-                className="flex items-center space-x-1 px-5 py-2 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold text-sm rounded-lg transition-all duration-200 whitespace-nowrap shadow-lg shadow-yellow-500/25"
+  if (!GROQ_API_KEY || GROQ_API_KEY === "your-groq-api-key-here") {
+    throw new Error(
+      "Groq API key not set. Please add VITE_GROQ_API_KEY in your .env file."
+    );
+  }
+
+  const systemPrompt = `You are NyayBot, an expert Indian legal AI assistant.
+Analyze the user's case details or FIR document and provide:
+1. 📋 Key Legal Issues
+2. ⚖️ Applicable Laws & Sections (IPC/BNS, BNSS, CrPC etc.)
+3. 🔍 Important Facts Extracted
+4. 📝 Recommended Next Steps
+5. 🔓 Bail Possibility (if relevant)
+IMPORTANT: Always respond in English only, regardless of what language the user writes in.
+Be clear, simple and helpful for common people who don't understand legal language.`;
+
+  // Build user content
+  // Note: Groq's free models (llama-3.2-11b-vision-preview) support vision
+  // If images are attached, use the vision model; otherwise use text model
+  const hasImages = images && images.length > 0;
+  const model = hasImages
+    ? "meta-llama/llama-4-scout-17b-16e-instruct" // Groq vision model
+    : "llama-3.1-8b-instant"; // Fast free text model
+
+  let userContent;
+
+  if (hasImages) {
+    // Vision model content format (array of content parts)
+    userContent = [
+      {
+        type: "text",
+        text: text?.trim()
+          ? `Analyze this case: ${text}`
+          : "Analyze the attached FIR or legal document image(s) and extract all important legal information.",
+      },
+      ...images.map((imgDataUrl) => ({
+        type: "image_url",
+        image_url: {
+          url: imgDataUrl,
+        },
+      })),
+    ];
+  } else {
+    userContent = text?.trim()
+      ? text
+      : "Please provide general information about Indian legal rights.";
+  }
+
+  const body = {
+    model,
+    messages: [
+      {
+        role: "system",
+        content: systemPrompt,
+      },
+      {
+        role: "user",
+        content: userContent,
+      },
+    ],
+    temperature: 0.3,
+    max_tokens: 1500,
+  };
+
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${GROQ_API_KEY}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = err?.error?.message || `Groq error ${res.status}`;
+    throw new Error(msg);
+  }
+
+  const data = await res.json();
+  const responseText = data?.choices?.[0]?.message?.content;
+  if (!responseText)
+    throw new Error("No response from Groq. Please try again.");
+  return responseText;
+}
+
+// ─── Main Hero Component ──────────────────────────────────────────────────────
+export default function Hero({
+  mode = "home",
+  lang = "en",
+  onBack,
+  onShowLawyers,
+  onFIRAnalysis,
+  onUploadFIR,
+}) {
+  const [text, setText] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [capturedImages, setCapturedImages] = useState([]);
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [cameraError, setCameraError] = useState("");
+  const [aiResponse, setAiResponse] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiError, setAiError] = useState("");
+
+  const textareaRef = useRef(null);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const attachMenuRef = useRef(null);
+  const responseRef = useRef(null);
+
+  useEffect(() => {
+    if (mode === "upload") {
+      const timer = setTimeout(() => openCamera(), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
+  }, [text]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (attachMenuRef.current && !attachMenuRef.current.contains(e.target)) {
+        setShowAttachMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Auto scroll to response
+  useEffect(() => {
+    if (aiResponse || aiError) {
+      setTimeout(
+        () =>
+          responseRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          }),
+        100
+      );
+    }
+  }, [aiResponse, aiError]);
+
+  const toggleVoice = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      recognitionRef.current = null;
+      setIsListening(false);
+      return;
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      alert("Speech recognition not supported in this browser.");
+      return;
+    }
+    const r = new SR();
+    r.continuous = true;
+    r.interimResults = true;
+    r.lang = lang === "hi" ? "hi-IN" : lang === "kn" ? "kn-IN" : "en-IN";
+    r.onresult = (e) =>
+      setText(
+        Array.from(e.results)
+          .map((res) => res[0].transcript)
+          .join("")
+      );
+    r.onerror = () => setIsListening(false);
+    r.onend = () => setIsListening(false);
+    r.start();
+    recognitionRef.current = r;
+    setIsListening(true);
+  };
+
+  const openCamera = async () => {
+    setShowAttachMenu(false);
+    setCameraError("");
+    setShowCamera(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    } catch {
+      setCameraError(t(lang, "camera_denied"));
+    }
+  };
+
+  const closeCamera = () => {
+    streamRef.current?.getTracks().forEach((tr) => tr.stop());
+    streamRef.current = null;
+    setShowCamera(false);
+    setCameraError("");
+  };
+
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    setCapturedImages((prev) => [...prev, { id: Date.now(), dataUrl }]);
+    closeCamera();
+  };
+
+  const removeImage = (id) => {
+    setCapturedImages((prev) => prev.filter((img) => img.id !== id));
+  };
+
+  const openGallery = useCallback(() => {
+    setShowAttachMenu(false);
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach((file) => {
+      if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          setCapturedImages((prev) => [
+            ...prev,
+            { id: Date.now() + Math.random(), dataUrl: ev.target.result },
+          ]);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        setAttachedFile(file);
+      }
+    });
+    e.target.value = "";
+  };
+
+  const openDocument = useCallback(() => {
+    setShowAttachMenu(false);
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = ".pdf,.doc,.docx,.txt";
+    inp.onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) setAttachedFile(file);
+    };
+    inp.click();
+  }, []);
+
+  const handleAnalyze = async () => {
+    if (!text.trim() && capturedImages.length === 0 && !attachedFile) return;
+    setAiResponse("");
+    setAiError("");
+    setIsAnalyzing(true);
+    try {
+      const images = capturedImages.map((img) => img.dataUrl);
+      const response = await callGroq({ text, images });
+      setAiResponse(response);
+    } catch (err) {
+      setAiError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const hasContent = !!(
+    text.trim() ||
+    capturedImages.length > 0 ||
+    attachedFile
+  );
+
+  const inputUI = (
+    <>
+      {/* Camera overlay */}
+      {showCamera && (
+        <div className="w-full mb-6 rounded-3xl overflow-hidden border border-yellow-500/30 bg-black shadow-2xl shadow-yellow-500/10 relative">
+          {cameraError ? (
+            <div className="flex flex-col items-center justify-center h-64 gap-4 px-8">
+              <p className="text-red-400 text-sm text-center">{cameraError}</p>
+              <button
+                onClick={closeCamera}
+                className="px-5 py-2.5 rounded-xl bg-white/8 border border-white/15 text-slate-300 text-sm font-medium hover:bg-white/15 transition-all"
               >
-                <span>Analyze</span>
-                <ArrowRight size={16} />
+                {t(lang, "camera_cancel")}
               </button>
             </div>
-          </div>
-
-          {/* Dual CTAs */}
-          <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
-            <button 
-              onClick={onAnalyzeClick}
-              className="group px-8 py-3.5 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold text-lg transition-all duration-300 shadow-[0_0_30px_rgba(250,204,21,0.25)] hover:shadow-[0_0_40px_rgba(250,204,21,0.4)] hover:-translate-y-1"
-            >
-              Analyze My Case
-            </button>
-            <button className="flex items-center space-x-2 px-8 py-3.5 rounded-xl border border-white/20 text-slate-200 hover:text-white hover:bg-white/10 hover:border-white/40 font-medium text-lg transition-all duration-200 backdrop-blur-sm">
-              <Play size={20} className="text-yellow-500 fill-yellow-500" />
-              <span>Watch Demo</span>
-            </button>
-          </div>
-
+          ) : (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full object-cover"
+              style={{ minHeight: "300px", maxHeight: "480px" }}
+            />
+          )}
+          {!cameraError && (
+            <>
+              <div className="absolute top-3 left-3 w-7 h-7 border-t-2 border-l-2 border-yellow-400 rounded-tl-md pointer-events-none" />
+              <div className="absolute top-3 right-3 w-7 h-7 border-t-2 border-r-2 border-yellow-400 rounded-tr-md pointer-events-none" />
+              <div className="absolute bottom-[72px] left-3 w-7 h-7 border-b-2 border-l-2 border-yellow-400 rounded-bl-md pointer-events-none" />
+              <div className="absolute bottom-[72px] right-3 w-7 h-7 border-b-2 border-r-2 border-yellow-400 rounded-br-md pointer-events-none" />
+              <div className="flex gap-3 p-4 bg-gradient-to-t from-black/80 via-black/50 to-transparent">
+                <button
+                  onClick={closeCamera}
+                  className="flex-1 py-3.5 rounded-2xl bg-white/10 border border-white/20 text-white font-semibold text-base hover:bg-white/20 transition-all"
+                >
+                  {t(lang, "camera_cancel")}
+                </button>
+                <button
+                  onClick={capturePhoto}
+                  className="flex-[2] py-3.5 rounded-2xl bg-yellow-500 text-slate-900 font-bold text-base flex items-center justify-center gap-2.5 hover:bg-yellow-400 transition-all shadow-lg shadow-yellow-500/30 active:scale-[0.98]"
+                >
+                  <Camera size={20} /> {t(lang, "camera_capture")}
+                </button>
+              </div>
+            </>
+          )}
         </div>
-      </header>
+      )}
 
-      {/* Translucent Overlap Cards */}
-      <section className="max-w-5xl mx-auto -mt-16 relative z-20 grid grid-cols-2 md:grid-cols-4 gap-6 px-4 pb-10">
-        {cards.map((item, index) => (
-          <div key={index} className="bg-[#141a2e]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center text-slate-200 hover:bg-[#1e2642] hover:border-yellow-500/40 transition duration-300 cursor-pointer shadow-2xl group">
-            <div className="text-yellow-500 mb-3 opacity-90 group-hover:scale-110 transition-transform duration-300">{item.icon}</div>
-            <span className="text-base font-medium tracking-wide">{item.title}</span>
+      {/* Multi-photo strip */}
+      {capturedImages.length > 0 && !showCamera && (
+        <div className="w-full mb-3 flex flex-wrap gap-2 bg-white/5 border border-white/10 rounded-2xl px-3 py-2.5">
+          <span className="w-full text-slate-400 text-xs font-semibold mb-1">
+            {capturedImages.length} {t(lang, "hero_photos_attached")}
+          </span>
+          {capturedImages.map((img) => (
+            <div key={img.id} className="relative shrink-0">
+              <img
+                src={img.dataUrl}
+                alt="Attached"
+                className="w-16 h-16 rounded-xl object-cover border border-yellow-500/30"
+              />
+              <button
+                onClick={() => removeImage(img.id)}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-700 border border-white/20 flex items-center justify-center text-white hover:bg-red-500 transition-all"
+              >
+                <X size={10} />
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={openGallery}
+            className="w-16 h-16 rounded-xl border-2 border-dashed border-yellow-500/30 flex items-center justify-center text-yellow-500/50 hover:border-yellow-500/60 hover:text-yellow-400 transition-all text-2xl font-light"
+          >
+            +
+          </button>
+        </div>
+      )}
+
+      {/* Attached doc badge */}
+      {attachedFile && (
+        <div className="w-full mb-3 flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3">
+          <Paperclip size={15} className="text-yellow-400 shrink-0" />
+          <span className="text-slate-300 text-sm truncate flex-1">
+            {attachedFile.name}
+          </span>
+          <button
+            onClick={() => setAttachedFile(null)}
+            className="text-slate-500 hover:text-red-400 transition-colors shrink-0"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Main input box */}
+      <div
+        className={`w-full rounded-3xl border transition-all duration-300 shadow-2xl ${
+          isListening
+            ? "bg-[#180a0a] border-red-500/40 shadow-red-500/8"
+            : "bg-[#0f0f0f] border-white/10 hover:border-yellow-500/20 focus-within:border-yellow-500/35"
+        }`}
+      >
+        {isListening && (
+          <div className="flex items-center gap-2.5 px-6 pt-4 pb-1">
+            <span className="flex gap-0.5">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="w-0.5 h-4 bg-red-500 rounded-full animate-pulse"
+                  style={{ animationDelay: `${i * 0.15}s` }}
+                />
+              ))}
+            </span>
+            <span className="text-red-400 text-xs font-semibold tracking-wider uppercase">
+              {t(lang, "listening_text")}
+            </span>
           </div>
-        ))}
+        )}
+
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleAnalyze();
+            }
+          }}
+          placeholder={
+            mode === "upload"
+              ? t(lang, "hero_placeholder_upload")
+              : t(lang, "hero_placeholder_home")
+          }
+          rows={2}
+          className="w-full bg-transparent text-white placeholder-slate-600 text-[15px] leading-relaxed resize-none px-6 pt-5 pb-3 focus:outline-none"
+          style={{ minHeight: "72px", maxHeight: "200px" }}
+        />
+
+        <div className="flex items-center gap-2.5 px-5 pb-4 pt-1">
+          <div className="relative">
+            {showAttachMenu && (
+              <AttachMenu
+                ref={attachMenuRef}
+                onCamera={openCamera}
+                onGallery={openGallery}
+                onDocument={openDocument}
+                lang={lang}
+              />
+            )}
+            <button
+              onClick={() => setShowAttachMenu((v) => !v)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold transition-all border ${
+                capturedImages.length > 0 || attachedFile
+                  ? "bg-yellow-500/15 border-yellow-500/40 text-yellow-300"
+                  : showAttachMenu
+                  ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-400"
+                  : "bg-white/5 border-white/10 text-slate-300 hover:text-yellow-400 hover:border-yellow-500/25 hover:bg-yellow-500/6"
+              }`}
+            >
+              <Paperclip size={15} />
+              <span>{t(lang, "hero_attach")}</span>
+              {capturedImages.length > 0 && (
+                <span className="bg-yellow-500 text-slate-900 text-[10px] font-black rounded-full w-4 h-4 flex items-center justify-center">
+                  {capturedImages.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf,.doc,.docx,.txt"
+            multiple
+            className="hidden"
+            onChange={handleFileChange}
+          />
+
+          <button
+            onClick={toggleVoice}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold transition-all border ${
+              isListening
+                ? "bg-red-500/20 border-red-500/50 text-red-400 shadow-lg shadow-red-500/15"
+                : "bg-white/5 border-white/10 text-slate-300 hover:text-yellow-400 hover:border-yellow-500/25 hover:bg-yellow-500/6"
+            }`}
+          >
+            {isListening ? (
+              <>
+                <MicOff size={15} />
+                <span>{t(lang, "hero_stop")}</span>
+              </>
+            ) : (
+              <>
+                <Mic size={15} />
+                <span>{t(lang, "hero_voice")}</span>
+              </>
+            )}
+          </button>
+
+          <div className="flex-1" />
+
+          <button
+            onClick={handleAnalyze}
+            disabled={!hasContent || isAnalyzing}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl text-sm font-bold transition-all duration-200 border ${
+              hasContent && !isAnalyzing
+                ? "bg-yellow-500 border-yellow-500 text-slate-900 hover:bg-yellow-400 hover:shadow-lg hover:shadow-yellow-500/25 active:scale-[0.97]"
+                : "bg-white/5 border-white/8 text-slate-600 cursor-not-allowed"
+            }`}
+          >
+            {isAnalyzing ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <Send size={15} />
+            )}
+            <span>
+              {isAnalyzing
+                ? t(lang, "hero_analyzing")
+                : t(lang, "hero_analyze")}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* AI Response Box */}
+      {(aiResponse || aiError || isAnalyzing) && (
+        <div
+          ref={responseRef}
+          className={`w-full mt-4 rounded-2xl border p-5 transition-all ${
+            aiError
+              ? "bg-red-500/8 border-red-500/25"
+              : isAnalyzing
+              ? "bg-white/3 border-white/10"
+              : "bg-[#0d1a0d] border-yellow-500/20"
+          }`}
+        >
+          {isAnalyzing ? (
+            <div className="flex items-center gap-3">
+              <Loader2 size={16} className="animate-spin text-yellow-400" />
+              <span className="text-slate-400 text-sm">
+                {t(lang, "hero_analyzing")}
+              </span>
+            </div>
+          ) : aiError ? (
+            <p className="text-red-400 text-sm">{aiError}</p>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+                <span className="text-yellow-400 text-xs font-bold uppercase tracking-widest">
+                  {t(lang, "hero_ai_response")}
+                </span>
+                <span className="ml-auto text-[10px] text-slate-600 font-medium">
+                  Powered by Groq
+                </span>
+              </div>
+              <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
+                {aiResponse}
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+      <p className="text-slate-600 text-xs mt-4 tracking-wide">
+        {t(lang, "hero_hint")}
+      </p>
+    </>
+  );
+
+  if (mode !== "home") {
+    return (
+      <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0a0a0a] pt-24 pb-16">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(212,160,23,0.15)_0%,transparent_65%)]" />
+        </div>
+        <div className="relative z-10 w-full max-w-3xl mx-auto px-4 flex flex-col items-center text-center">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="self-start flex items-center gap-2 text-slate-500 hover:text-yellow-400 text-sm font-semibold mb-8 px-3 py-2 rounded-xl hover:bg-yellow-500/8 border border-transparent hover:border-yellow-500/20 transition-all"
+            >
+              <ArrowLeft size={15} /> {t(lang, "hero_back")}
+            </button>
+          )}
+          <div className="mb-5 inline-flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-xs font-semibold px-4 py-1.5 rounded-full tracking-widest uppercase">
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+            {mode === "upload"
+              ? t(lang, "hero_upload_fir")
+              : t(lang, "hero_fir_analysis")}
+          </div>
+          <h2 className="font-serif text-4xl font-bold text-white mb-8">
+            {mode === "upload"
+              ? t(lang, "hero_upload_title")
+              : t(lang, "hero_analyze_title")}
+          </h2>
+          {inputUI}
+        </div>
       </section>
-    </div>
+    );
+  }
+
+  return (
+    <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0a0a0a] pt-24 pb-16">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(212,160,23,0.15)_0%,transparent_65%)]" />
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-[radial-gradient(ellipse_at_bottom,rgba(180,120,0,0.10)_0%,transparent_70%)]" />
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center opacity-[0.07] pointer-events-none select-none">
+        <svg
+          viewBox="0 0 400 400"
+          className="w-[600px] h-[600px] text-yellow-500"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1"
+        >
+          <line x1="200" y1="60" x2="200" y2="340" />
+          <line x1="80" y1="120" x2="320" y2="120" />
+          <circle cx="200" cy="60" r="8" fill="currentColor" />
+          <line x1="80" y1="120" x2="80" y2="200" />
+          <ellipse cx="80" cy="210" rx="50" ry="18" />
+          <line x1="320" y1="120" x2="320" y2="180" />
+          <ellipse cx="320" cy="190" rx="50" ry="18" />
+          <rect
+            x="180"
+            y="340"
+            width="40"
+            height="8"
+            rx="2"
+            fill="currentColor"
+            opacity="0.5"
+          />
+        </svg>
+      </div>
+
+      <div className="relative z-10 w-full max-w-3xl mx-auto px-4 flex flex-col items-center text-center">
+        <div className="mb-6 inline-flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-xs font-semibold px-4 py-1.5 rounded-full tracking-widest uppercase">
+          <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+          {t(lang, "hero_badge")}
+        </div>
+        <h1 className="font-serif text-5xl md:text-6xl font-bold text-white leading-tight mb-4">
+          {t(lang, "hero_title1")}
+          <br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-300">
+            {t(lang, "hero_title2")}
+          </span>
+        </h1>
+        <p className="text-slate-400 text-lg mb-10 max-w-xl leading-relaxed">
+          {t(lang, "hero_subtitle")}
+        </p>
+
+        {inputUI}
+
+        <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-4 mt-10">
+          {[
+            {
+              Icon: FileText,
+              key: "hero_fir_analysis",
+              onClick: onFIRAnalysis,
+            },
+            { Icon: Upload, key: "hero_upload_fir", onClick: onUploadFIR },
+            { Icon: Users, key: "hero_local_lawyers", onClick: onShowLawyers },
+          ].map(({ Icon, key, onClick }) => (
+            <button
+              key={key}
+              onClick={onClick}
+              className="group flex flex-col items-center gap-3 bg-[#111827] hover:bg-[#161f30] border border-white/8 hover:border-yellow-500/30 rounded-2xl px-6 py-8 transition-all duration-200 hover:shadow-[0_0_30px_rgba(234,179,8,0.08)] active:scale-[0.98]"
+            >
+              <Icon
+                size={32}
+                className="text-yellow-500 group-hover:text-yellow-400 transition-colors"
+              />
+              <span className="text-white font-bold text-base">
+                {t(lang, key)}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
