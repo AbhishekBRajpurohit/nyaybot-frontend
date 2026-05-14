@@ -620,9 +620,10 @@ export default function Hero({
 
   if (mode !== "home") {
     return (
-      <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0a0a0a] pt-24 pb-16">
+      <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden pt-24 pb-16" style={{background: "linear-gradient(135deg, #0a0c18 0%, #0d1020 40%, #111428 100%)"}}>
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(212,160,23,0.15)_0%,transparent_65%)]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(212,160,23,0.12)_0%,transparent_65%)]" />
+          <div className="absolute bottom-0 right-0 w-[600px] h-[600px] rounded-full bg-[radial-gradient(ellipse_at_bottom_right,rgba(30,40,120,0.25)_0%,transparent_70%)]" />
         </div>
         <div className="relative z-10 w-full max-w-3xl mx-auto px-4 flex flex-col items-center text-center">
           {onBack && (
@@ -651,12 +652,18 @@ export default function Hero({
   }
 
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0a0a0a] pt-24 pb-16">
+    <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden pt-24 pb-16" style={{background: "linear-gradient(135deg, #08091a 0%, #0c0f22 35%, #10142e 65%, #0d1020 100%)"}}>
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(212,160,23,0.15)_0%,transparent_65%)]" />
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-[radial-gradient(ellipse_at_bottom,rgba(180,120,0,0.10)_0%,transparent_70%)]" />
+        {/* Main gold glow */}
+        <div className="absolute top-1/2 left-1/4 -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(212,160,23,0.13)_0%,transparent_65%)]" />
+        {/* Right side blue-navy depth */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full bg-[radial-gradient(ellipse_at_top_right,rgba(25,35,110,0.35)_0%,transparent_65%)]" />
+        {/* Bottom glow */}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-[radial-gradient(ellipse_at_bottom,rgba(180,120,0,0.08)_0%,transparent_70%)]" />
+        {/* Subtle noise texture overlay */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{backgroundImage:"url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")", backgroundSize:"200px"}} />
       </div>
-      <div className="absolute inset-0 flex items-center justify-center opacity-[0.07] pointer-events-none select-none">
+      <div className="absolute inset-0 flex items-center justify-center opacity-[0.05] pointer-events-none select-none">
         <svg
           viewBox="0 0 400 400"
           className="w-[600px] h-[600px] text-yellow-500"

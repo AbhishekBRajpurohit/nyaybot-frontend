@@ -14,10 +14,20 @@ export default function App() {
 
   const lang = LANG_CODES[langLabel] || "en";
 
+  const navbar = (
+    <Navbar
+      activeView={activeView}
+      onNavigate={setActiveView}
+      lang={lang}
+      langLabel={langLabel}
+      onLangChange={setLangLabel}
+    />
+  );
+
   if (activeView === "lawyers") {
     return (
       <div className="min-h-screen bg-[#0a0a0a] font-sans text-white">
-        <Navbar activeView={activeView} onNavigate={setActiveView} lang={lang} langLabel={langLabel} onLangChange={setLangLabel} />
+        {navbar}
         <LawyerDirectory onBack={() => setActiveView("home")} lang={lang} />
       </div>
     );
@@ -26,8 +36,13 @@ export default function App() {
   if (activeView === "analyze") {
     return (
       <div className="min-h-screen bg-[#0a0a0a] font-sans text-white">
-        <Navbar activeView={activeView} onNavigate={setActiveView} lang={lang} langLabel={langLabel} onLangChange={setLangLabel} />
-        <Hero mode="analyze" lang={lang} onBack={() => setActiveView("home")} onShowLawyers={() => setActiveView("lawyers")} />
+        {navbar}
+        <Hero
+          mode="analyze"
+          lang={lang}
+          onBack={() => setActiveView("home")}
+          onShowLawyers={() => setActiveView("lawyers")}
+        />
       </div>
     );
   }
@@ -35,16 +50,22 @@ export default function App() {
   if (activeView === "upload") {
     return (
       <div className="min-h-screen bg-[#0a0a0a] font-sans text-white">
-        <Navbar activeView={activeView} onNavigate={setActiveView} lang={lang} langLabel={langLabel} onLangChange={setLangLabel} />
-        <Hero mode="upload" lang={lang} onBack={() => setActiveView("home")} onShowLawyers={() => setActiveView("lawyers")} />
+        {navbar}
+        <Hero
+          mode="upload"
+          lang={lang}
+          onBack={() => setActiveView("home")}
+          onShowLawyers={() => setActiveView("lawyers")}
+        />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] font-sans text-white">
-      <Navbar activeView={activeView} onNavigate={setActiveView} lang={lang} langLabel={langLabel} onLangChange={setLangLabel} />
+      {navbar}
       <Hero
+        mode="home"
         lang={lang}
         onFIRAnalysis={() => setActiveView("analyze")}
         onUploadFIR={() => setActiveView("upload")}
@@ -52,7 +73,7 @@ export default function App() {
       />
       <StatsBar lang={lang} />
       <HowItWorks lang={lang} />
-      <CTA lang={lang} onAnalyzeClick={() => setActiveView("analyze")} />
+      <CTA lang={lang} onGetStarted={() => setActiveView("analyze")} />
       <Footer lang={lang} />
     </div>
   );
