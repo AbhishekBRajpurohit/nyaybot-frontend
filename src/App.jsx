@@ -1,21 +1,21 @@
 import React, { useState } from "react";
-import Navbar from "./components/Navbar";
-import Hero from "./components/Hero";
-import ReportView from "./components/ReportView";
-import StatsBar from "./components/StatsBar";
-import HowItWorks from "./components/HowItWorks";
+import Navbar          from "./components/Navbar";
+import Hero            from "./components/Hero";
+import ReportView      from "./components/ReportView";
+import StatsBar        from "./components/StatsBar";
+import HowItWorks      from "./components/HowItWorks";
 import LawyerDirectory from "./components/LawyerDirectory";
-import CTA from "./components/CTA";
-import Footer from "./components/Footer";
-import AuthModal from "./components/AuthModal";
-import { LANG_CODES } from "./i18n";
+import CTA             from "./components/CTA";
+import Footer          from "./components/Footer";
+import AuthModal       from "./components/AuthModal";
+import HistoryView     from "./components/HistoryView";
+import { LANG_CODES }  from "./i18n";
 
 export default function App() {
   const [activeView, setActiveView] = useState("home");
   const [langLabel, setLangLabel]   = useState("English");
   const [showAuth, setShowAuth]     = useState(false);
 
-  // report = { aiResponse, inputText, timestamp }
   const [report, setReport] = useState(() => {
     try {
       const saved = localStorage.getItem("nyaybot_report");
@@ -41,6 +41,23 @@ export default function App() {
     />
   );
 
+  // ── History ───────────────────────────────────────────────────────────────
+  if (activeView === "history") return (
+    <div className="min-h-screen bg-[#08091a] font-sans text-white">
+      {sharedNavbar}
+      <HistoryView
+        lang={lang}
+        onBack={() => setActiveView("home")}
+        onOpenReport={(payload) => {
+          setReport(payload);
+          setActiveView("report");
+        }}
+      />
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+    </div>
+  );
+
+  // ── Lawyers ───────────────────────────────────────────────────────────────
   if (activeView === "lawyers") return (
     <div className="min-h-screen bg-[#0a0a0a] font-sans text-white">
       {sharedNavbar}
@@ -49,6 +66,7 @@ export default function App() {
     </div>
   );
 
+  // ── Analyze ───────────────────────────────────────────────────────────────
   if (activeView === "analyze") return (
     <div className="min-h-screen bg-[#0a0a0a] font-sans text-white">
       {sharedNavbar}
@@ -63,6 +81,7 @@ export default function App() {
     </div>
   );
 
+  // ── Upload FIR ────────────────────────────────────────────────────────────
   if (activeView === "upload") return (
     <div className="min-h-screen bg-[#0a0a0a] font-sans text-white">
       {sharedNavbar}
@@ -77,6 +96,7 @@ export default function App() {
     </div>
   );
 
+  // ── Report ────────────────────────────────────────────────────────────────
   if (activeView === "report") return (
     <div className="min-h-screen bg-[#08091a] font-sans text-white">
       {sharedNavbar}
@@ -89,19 +109,21 @@ export default function App() {
     </div>
   );
 
+  // ── Home ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#0a0a0a] font-sans text-white">
       {sharedNavbar}
       <Hero
         lang={lang}
         onFIRAnalysis={() => setActiveView("analyze")}
-        onUploadFIR={() => setActiveView("upload")}
-        onShowLawyers={() => setActiveView("lawyers")}
+        onUploadFIR={()   => setActiveView("upload")}
+        onShowLawyers={()  => setActiveView("lawyers")}
+        onReportReady={handleReportReady}
       />
-      <StatsBar lang={lang} />
+      <StatsBar   lang={lang} />
       <HowItWorks lang={lang} />
-      <CTA lang={lang} onAnalyzeClick={() => setActiveView("analyze")} />
-      <Footer lang={lang} />
+      <CTA        lang={lang} onAnalyzeClick={() => setActiveView("analyze")} />
+      <Footer     lang={lang} />
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
     </div>
   );
