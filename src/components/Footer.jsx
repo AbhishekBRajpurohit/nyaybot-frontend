@@ -73,7 +73,7 @@ export default function Footer({ lang = "en" }) {
       >
         {[
           { icon: <Mail size={14} />, label: "support@nyaybot.in" },
-          { icon: <Phone size={14} />, label: "+91 98765 43210" },
+          { icon: <Phone size={14} />, label: "+91 9078456234" },
           { icon: <MapPin size={14} />, label: "Bengaluru, Karnataka, India" },
         ].map(({ icon, label }) => (
           <span
