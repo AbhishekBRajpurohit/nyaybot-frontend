@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { t } from "../i18n";
 
-// ─── Attach Menu ─────────────────────────────────────────────────────────────
+// ─── Attach Menu ────────────────────────────────────────────────────────────
 const AttachMenu = React.forwardRef(function AttachMenu(
   { onCamera, onGallery, onDocument, lang },
   ref
@@ -59,7 +59,7 @@ const AttachMenu = React.forwardRef(function AttachMenu(
   );
 });
 
-// ─── Groq API Call ────────────────────────────────────────────────────────────
+// ─── Groq API Call ─────────────────────────────────────────────────────────
 async function callGroq({ text, images }) {
   const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 
@@ -79,13 +79,18 @@ Analyze the user's case details or FIR document and provide:
 IMPORTANT: Always respond in English only, regardless of what language the user writes in.
 Be clear, simple and helpful for common people who don't understand legal language.`;
 
+  // Build user content
+  // Note: Groq's free models (llama-3.2-11b-vision-preview) support vision
+  // If images are attached, use the vision model; otherwise use text model
   const hasImages = images && images.length > 0;
   const model = hasImages
-    ? "meta-llama/llama-4-scout-17b-16e-instruct"
-    : "llama-3.1-8b-instant";
+    ? "meta-llama/llama-4-scout-17b-16e-instruct" // Groq vision model
+    : "llama-3.1-8b-instant"; // Fast free text model
 
   let userContent;
+
   if (hasImages) {
+    // Vision model content format (array of content parts)
     userContent = [
       {
         type: "text",
@@ -95,7 +100,9 @@ Be clear, simple and helpful for common people who don't understand legal langua
       },
       ...images.map((imgDataUrl) => ({
         type: "image_url",
-        image_url: { url: imgDataUrl },
+        image_url: {
+          url: imgDataUrl,
+        },
       })),
     ];
   } else {
@@ -107,30 +114,38 @@ Be clear, simple and helpful for common people who don't understand legal langua
   const body = {
     model,
     messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user",   content: userContent  },
+      {
+        role: "system",
+        content: systemPrompt,
+      },
+      {
+        role: "user",
+        content: userContent,
+      },
     ],
     temperature: 0.3,
-    max_tokens:  1500,
+    max_tokens: 1500,
   };
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method:  "POST",
+    method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization:  `Bearer ${GROQ_API_KEY}`,
+      Authorization: `Bearer ${GROQ_API_KEY}`,
     },
     body: JSON.stringify(body),
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `Groq error ${res.status}`);
+    const msg = err?.error?.message || `Groq error ${res.status}`;
+    throw new Error(msg);
   }
 
   const data = await res.json();
   const responseText = data?.choices?.[0]?.message?.content;
-  if (!responseText) throw new Error("No response from Groq. Please try again.");
+  if (!responseText)
+    throw new Error("No response from Groq. Please try again.");
   return responseText;
 }
 
@@ -144,24 +159,24 @@ export default function Hero({
   onUploadFIR,
   onReportReady,
 }) {
-  const [text, setText]                   = useState("");
-  const [isListening, setIsListening]     = useState(false);
-  const [showCamera, setShowCamera]       = useState(false);
+  const [text, setText] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [capturedImages, setCapturedImages] = useState([]);
-  const [attachedFile, setAttachedFile]   = useState(null);
-  const [cameraError, setCameraError]     = useState("");
-  const [aiResponse, setAiResponse]       = useState("");
-  const [isAnalyzing, setIsAnalyzing]     = useState(false);
-  const [aiError, setAiError]             = useState("");
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [cameraError, setCameraError] = useState("");
+  const [aiResponse, setAiResponse] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiError, setAiError] = useState("");
 
-  const textareaRef   = useRef(null);
-  const videoRef      = useRef(null);
-  const streamRef     = useRef(null);
+  const textareaRef = useRef(null);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
   const recognitionRef = useRef(null);
-  const fileInputRef  = useRef(null);
+  const fileInputRef = useRef(null);
   const attachMenuRef = useRef(null);
-  const responseRef   = useRef(null);
+  const responseRef = useRef(null);
 
   useEffect(() => {
     if (mode === "upload") {
@@ -187,10 +202,15 @@ export default function Hero({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // Auto scroll to response
   useEffect(() => {
     if (aiResponse || aiError) {
       setTimeout(
-        () => responseRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }),
+        () =>
+          responseRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          }),
         100
       );
     }
@@ -204,15 +224,22 @@ export default function Hero({
       return;
     }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { alert("Speech recognition not supported in this browser."); return; }
+    if (!SR) {
+      alert("Speech recognition not supported in this browser.");
+      return;
+    }
     const r = new SR();
-    r.continuous     = true;
+    r.continuous = true;
     r.interimResults = true;
     r.lang = lang === "hi" ? "hi-IN" : lang === "kn" ? "kn-IN" : "en-IN";
     r.onresult = (e) =>
-      setText(Array.from(e.results).map((res) => res[0].transcript).join(""));
+      setText(
+        Array.from(e.results)
+          .map((res) => res[0].transcript)
+          .join("")
+      );
     r.onerror = () => setIsListening(false);
-    r.onend   = () => setIsListening(false);
+    r.onend = () => setIsListening(false);
     r.start();
     recognitionRef.current = r;
     setIsListening(true);
@@ -224,7 +251,11 @@ export default function Hero({
     setShowCamera(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
         audio: false,
       });
       streamRef.current = stream;
@@ -245,7 +276,7 @@ export default function Hero({
     const video = videoRef.current;
     if (!video) return;
     const canvas = document.createElement("canvas");
-    canvas.width  = video.videoWidth  || 1280;
+    canvas.width = video.videoWidth || 1280;
     canvas.height = video.videoHeight || 720;
     canvas.getContext("2d").drawImage(video, 0, 0);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
@@ -284,7 +315,7 @@ export default function Hero({
   const openDocument = useCallback(() => {
     setShowAttachMenu(false);
     const inp = document.createElement("input");
-    inp.type   = "file";
+    inp.type = "file";
     inp.accept = ".pdf,.doc,.docx,.txt";
     inp.onchange = (e) => {
       const file = e.target.files[0];
@@ -293,75 +324,47 @@ export default function Hero({
     inp.click();
   }, []);
 
-  // ─── handleAnalyze — saves to PostgreSQL ─────────────────────────────────
   const handleAnalyze = async () => {
     if (!text.trim() && capturedImages.length === 0 && !attachedFile) return;
     setAiResponse("");
     setAiError("");
     setIsAnalyzing(true);
-
     try {
-      const images   = capturedImages.map((img) => img.dataUrl);
+      const images = capturedImages.map((img) => img.dataUrl);
       const response = await callGroq({ text, images });
       setAiResponse(response);
 
-      // Parse metadata
+      // Detect case type and bail
       const combined = response + " " + text;
-
       let caseType = "Criminal";
-      if (combined.toLowerCase().includes("pocso"))       caseType = "POCSO";
-      else if (combined.toLowerCase().includes("cyber"))  caseType = "Cyber";
-      else if (combined.toLowerCase().includes("civil"))  caseType = "Civil";
-      else if (combined.toLowerCase().includes("murder")) caseType = "Murder";
-      else if (combined.toLowerCase().includes("family")) caseType = "Family";
+      if (combined.toLowerCase().includes("pocso") || combined.toLowerCase().includes("posco")) caseType = "POCSO";
+      else if (combined.toLowerCase().includes("cyber")) caseType = "Cyber";
+      else if (combined.toLowerCase().includes("civil")) caseType = "Civil";
+      else if (combined.toLowerCase().includes("property")) caseType = "Property";
+      else if (combined.toLowerCase().includes("money laundering")) caseType = "Financial";
+      else if (combined.toLowerCase().includes("family") || combined.toLowerCase().includes("divorce")) caseType = "Family";
 
-      const sections = [];
-      const ipcRx = /IPC\s*(\d+[A-Z]?)/gi;
-      let m;
-      while ((m = ipcRx.exec(combined)) !== null) {
-        const code = `IPC ${m[1]}`;
-        if (!sections.find((s) => s.code === code)) sections.push({ code });
-      }
-
+      let bailPct = 65;
       const bailMatch = response.match(/(\d{2,3})\s*%/);
-      const bailPct   = bailMatch ? Math.min(95, parseInt(bailMatch[1])) : 65;
-
-      const reportPayload = {
-        aiResponse: response,
-        inputText:  text,
-        timestamp:  Date.now(),
-      };
+      if (bailMatch) bailPct = Math.min(95, parseInt(bailMatch[1]));
+      if (response.toLowerCase().includes("bail is generally not granted") || response.toLowerCase().includes("non-bailable")) bailPct = Math.min(bailPct, 30);
+      else if (response.toLowerCase().includes("bailable")) bailPct = Math.max(bailPct, 72);
 
       // Save to localStorage
-      try {
-        localStorage.setItem("nyaybot_report", JSON.stringify(reportPayload));
-      } catch (_) {}
+      const reportPayload = { aiResponse: response, inputText: text, timestamp: Date.now() };
+      try { localStorage.setItem("nyaybot_report", JSON.stringify(reportPayload)); } catch (_) {}
 
-      // Save to PostgreSQL
+      // Save to PostgreSQL history (silently — works only if logged in)
       try {
-        const saveRes = await fetch("http://localhost:4000/api/reports", {
-          method:      "POST",
-          headers:     { "Content-Type": "application/json" },
+        await fetch("http://localhost:4000/api/history/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({
-            inputText:  text,
-            aiResponse: response,
-            caseType,
-            bailPct,
-            sections,
-          }),
+          body: JSON.stringify({ inputText: text, aiResponse: response, caseType, bailPct }),
         });
-        const saveData = await saveRes.json();
-        if (saveData.reportId) {
-          reportPayload.reportId = saveData.reportId;
-          localStorage.setItem("nyaybot_report", JSON.stringify(reportPayload));
-        }
-      } catch (saveErr) {
-        console.warn("DB save failed (non-fatal):", saveErr.message);
-      }
+      } catch (_) { /* not logged in — skip */ }
 
       if (onReportReady) onReportReady(reportPayload);
-
     } catch (err) {
       setAiError(err.message || "Something went wrong. Please try again.");
     } finally {
@@ -369,9 +372,12 @@ export default function Hero({
     }
   };
 
-  const hasContent = !!(text.trim() || capturedImages.length > 0 || attachedFile);
+  const hasContent = !!(
+    text.trim() ||
+    capturedImages.length > 0 ||
+    attachedFile
+  );
 
-  // ─── Input UI ─────────────────────────────────────────────────────────────
   const inputUI = (
     <>
       {/* Camera overlay */}
@@ -645,7 +651,6 @@ export default function Hero({
     </>
   );
 
-  // ─── Non-home mode ────────────────────────────────────────────────────────
   if (mode !== "home") {
     return (
       <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0a0a0a] pt-24 pb-16">
@@ -678,14 +683,12 @@ export default function Hero({
     );
   }
 
-  // ─── Home mode ────────────────────────────────────────────────────────────
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0a0a0a] pt-24 pb-16">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(212,160,23,0.15)_0%,transparent_65%)]" />
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-[radial-gradient(ellipse_at_bottom,rgba(180,120,0,0.10)_0%,transparent_70%)]" />
       </div>
-
       <div className="absolute inset-0 flex items-center justify-center opacity-[0.07] pointer-events-none select-none">
         <svg
           viewBox="0 0 400 400"
@@ -701,7 +704,15 @@ export default function Hero({
           <ellipse cx="80" cy="210" rx="50" ry="18" />
           <line x1="320" y1="120" x2="320" y2="180" />
           <ellipse cx="320" cy="190" rx="50" ry="18" />
-          <rect x="180" y="340" width="40" height="8" rx="2" fill="currentColor" opacity="0.5" />
+          <rect
+            x="180"
+            y="340"
+            width="40"
+            height="8"
+            rx="2"
+            fill="currentColor"
+            opacity="0.5"
+          />
         </svg>
       </div>
 
@@ -710,7 +721,6 @@ export default function Hero({
           <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
           {t(lang, "hero_badge")}
         </div>
-
         <h1 className="font-serif text-5xl md:text-6xl font-bold text-white leading-tight mb-4">
           {t(lang, "hero_title1")}
           <br />
@@ -718,7 +728,6 @@ export default function Hero({
             {t(lang, "hero_title2")}
           </span>
         </h1>
-
         <p className="text-slate-400 text-lg mb-10 max-w-xl leading-relaxed">
           {t(lang, "hero_subtitle")}
         </p>
@@ -727,9 +736,13 @@ export default function Hero({
 
         <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-4 mt-10">
           {[
-            { Icon: FileText, key: "hero_fir_analysis",  onClick: onFIRAnalysis  },
-            { Icon: Upload,   key: "hero_upload_fir",    onClick: onUploadFIR    },
-            { Icon: Users,    key: "hero_local_lawyers", onClick: onShowLawyers  },
+            {
+              Icon: FileText,
+              key: "hero_fir_analysis",
+              onClick: onFIRAnalysis,
+            },
+            { Icon: Upload, key: "hero_upload_fir", onClick: onUploadFIR },
+            { Icon: Users, key: "hero_local_lawyers", onClick: onShowLawyers },
           ].map(({ Icon, key, onClick }) => (
             <button
               key={key}

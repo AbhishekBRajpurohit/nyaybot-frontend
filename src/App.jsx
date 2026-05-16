@@ -1,21 +1,24 @@
 import React, { useState } from "react";
-import Navbar          from "./components/Navbar";
-import Hero            from "./components/Hero";
-import ReportView      from "./components/ReportView";
-import StatsBar        from "./components/StatsBar";
-import HowItWorks      from "./components/HowItWorks";
+import Navbar from "./components/Navbar";
+import Hero from "./components/Hero";
+import ReportView from "./components/ReportView";
+import StatsBar from "./components/StatsBar";
+import HowItWorks from "./components/HowItWorks";
 import LawyerDirectory from "./components/LawyerDirectory";
-import CTA             from "./components/CTA";
-import Footer          from "./components/Footer";
-import AuthModal       from "./components/AuthModal";
-import HistoryView     from "./components/HistoryView";
-import { LANG_CODES }  from "./i18n";
+import HistoryView from "./components/HistoryView";
+import AlertsView from "./components/AlertsView";
+import ProfileView from "./components/ProfileView";
+import CTA from "./components/CTA";
+import Footer from "./components/Footer";
+import AuthModal from "./components/AuthModal";
+import { LANG_CODES } from "./i18n";
 
 export default function App() {
   const [activeView, setActiveView] = useState("home");
   const [langLabel, setLangLabel]   = useState("English");
   const [showAuth, setShowAuth]     = useState(false);
 
+  // report = { aiResponse, inputText, timestamp }
   const [report, setReport] = useState(() => {
     try {
       const saved = localStorage.getItem("nyaybot_report");
@@ -26,6 +29,11 @@ export default function App() {
   const lang = LANG_CODES[langLabel] || "en";
 
   const handleReportReady = (data) => {
+    setReport(data);
+    setActiveView("report");
+  };
+
+  const handleViewReport = (data) => {
     setReport(data);
     setActiveView("report");
   };
@@ -41,23 +49,7 @@ export default function App() {
     />
   );
 
-  // ── History ───────────────────────────────────────────────────────────────
-  if (activeView === "history") return (
-    <div className="min-h-screen bg-[#08091a] font-sans text-white">
-      {sharedNavbar}
-      <HistoryView
-        lang={lang}
-        onBack={() => setActiveView("home")}
-        onOpenReport={(payload) => {
-          setReport(payload);
-          setActiveView("report");
-        }}
-      />
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
-    </div>
-  );
-
-  // ── Lawyers ───────────────────────────────────────────────────────────────
+  // ── Lawyers ──
   if (activeView === "lawyers") return (
     <div className="min-h-screen bg-[#0a0a0a] font-sans text-white">
       {sharedNavbar}
@@ -66,13 +58,11 @@ export default function App() {
     </div>
   );
 
-  // ── Analyze ───────────────────────────────────────────────────────────────
+  // ── Analyze ──
   if (activeView === "analyze") return (
     <div className="min-h-screen bg-[#0a0a0a] font-sans text-white">
       {sharedNavbar}
-      <Hero
-        mode="analyze"
-        lang={lang}
+      <Hero mode="analyze" lang={lang}
         onBack={() => setActiveView("home")}
         onShowLawyers={() => setActiveView("lawyers")}
         onReportReady={handleReportReady}
@@ -81,13 +71,11 @@ export default function App() {
     </div>
   );
 
-  // ── Upload FIR ────────────────────────────────────────────────────────────
+  // ── Upload ──
   if (activeView === "upload") return (
     <div className="min-h-screen bg-[#0a0a0a] font-sans text-white">
       {sharedNavbar}
-      <Hero
-        mode="upload"
-        lang={lang}
+      <Hero mode="upload" lang={lang}
         onBack={() => setActiveView("home")}
         onShowLawyers={() => setActiveView("lawyers")}
         onReportReady={handleReportReady}
@@ -96,34 +84,55 @@ export default function App() {
     </div>
   );
 
-  // ── Report ────────────────────────────────────────────────────────────────
+  // ── Report ──
   if (activeView === "report") return (
     <div className="min-h-screen bg-[#08091a] font-sans text-white">
       {sharedNavbar}
-      <ReportView
-        lang={lang}
-        report={report}
-        onBack={() => setActiveView("home")}
-      />
+      <ReportView lang={lang} report={report} onBack={() => setActiveView("home")} />
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
     </div>
   );
 
-  // ── Home ──────────────────────────────────────────────────────────────────
+  // ── History ──
+  if (activeView === "history") return (
+    <div className="min-h-screen bg-[#08091a] font-sans text-white">
+      {sharedNavbar}
+      <HistoryView onBack={() => setActiveView("home")} onViewReport={handleViewReport} />
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+    </div>
+  );
+
+  // ── Alerts ──
+  if (activeView === "alerts") return (
+    <div className="min-h-screen bg-[#08091a] font-sans text-white">
+      {sharedNavbar}
+      <AlertsView onBack={() => setActiveView("home")} />
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+    </div>
+  );
+
+  // ── Profile ──
+  if (activeView === "profile") return (
+    <div className="min-h-screen bg-[#08091a] font-sans text-white">
+      {sharedNavbar}
+      <ProfileView onBack={() => setActiveView("home")} onViewReport={handleViewReport} />
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+    </div>
+  );
+
+  // ── Home ──
   return (
     <div className="min-h-screen bg-[#0a0a0a] font-sans text-white">
       {sharedNavbar}
-      <Hero
-        lang={lang}
+      <Hero lang={lang}
         onFIRAnalysis={() => setActiveView("analyze")}
-        onUploadFIR={()   => setActiveView("upload")}
-        onShowLawyers={()  => setActiveView("lawyers")}
-        onReportReady={handleReportReady}
+        onUploadFIR={() => setActiveView("upload")}
+        onShowLawyers={() => setActiveView("lawyers")}
       />
-      <StatsBar   lang={lang} />
+      <StatsBar lang={lang} />
       <HowItWorks lang={lang} />
-      <CTA        lang={lang} onAnalyzeClick={() => setActiveView("analyze")} />
-      <Footer     lang={lang} />
+      <CTA lang={lang} onAnalyzeClick={() => setActiveView("analyze")} />
+      <Footer lang={lang} />
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
     </div>
   );
