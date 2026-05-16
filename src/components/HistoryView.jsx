@@ -1,218 +1,191 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  ArrowLeft,
-  FileText,
-  Clock,
-  Trash2,
-  ChevronRight,
-  Scale,
-  AlertTriangle,
-  Loader2,
+  ArrowLeft, Clock, Trash2, FileText, Search,
+  TrendingUp, Gavel, ChevronRight, Loader2, AlertCircle
 } from "lucide-react";
+import { useAuth } from "./AuthContext";
 
 const API = "http://localhost:4000";
 
-export default function HistoryView({ onBack, onOpenReport, lang = "en" }) {
-  const [reports, setReports]   = useState([]);
+function getBailColor(pct) {
+  if (pct >= 65) return { text: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/25" };
+  if (pct >= 35) return { text: "text-yellow-400",  bg: "bg-yellow-500/10  border-yellow-500/25"  };
+  return           { text: "text-red-400",     bg: "bg-red-500/10     border-red-500/25"     };
+}
+
+export default function HistoryView({ onBack, onViewReport }) {
+  const { user } = useAuth();
+  const [history, setHistory]   = useState([]);
   const [loading, setLoading]   = useState(true);
+  const [search, setSearch]     = useState("");
   const [deleting, setDeleting] = useState(null);
   const [error, setError]       = useState("");
 
   useEffect(() => {
-    fetch(`${API}/api/reports`, { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => {
-        setReports(data.reports || []);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError("Could not connect to server. Make sure the backend is running on port 4000.");
-        setLoading(false);
-      });
-  }, []);
+    if (!user) { setLoading(false); return; }
+    fetch(`${API}/api/history`, { credentials: "include" })
+      .then(r => r.json())
+      .then(data => { setHistory(data.history || []); setLoading(false); })
+      .catch(() => { setError("Failed to load history."); setLoading(false); });
+  }, [user]);
 
-  const handleDelete = async (e, id) => {
-    e.stopPropagation();
-    if (!window.confirm("Delete this report permanently?")) return;
+  const handleDelete = async (id) => {
     setDeleting(id);
     try {
-      const res  = await fetch(`${API}/api/reports/${id}`, {
-        method:      "DELETE",
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (data.success) {
-        setReports((prev) => prev.filter((r) => r.id !== id));
-      } else {
-        alert(data.error || "Delete failed.");
-      }
-    } catch {
-      alert("Delete failed. Try again.");
-    } finally {
-      setDeleting(null);
-    }
+      await fetch(`${API}/api/history/${id}`, { method: "DELETE", credentials: "include" });
+      setHistory(prev => prev.filter(h => h.id !== id));
+    } catch { setError("Failed to delete."); }
+    finally { setDeleting(null); }
   };
 
-  const handleOpen = (r) => {
-    const payload = {
-      aiResponse: r.ai_response,
-      inputText:  r.input_text,
-      reportId:   r.id,
-      timestamp:  new Date(r.created_at).getTime(),
-    };
-    localStorage.setItem("nyaybot_report", JSON.stringify(payload));
-    if (onOpenReport) onOpenReport(payload);
-  };
+  const filtered = history.filter(h =>
+    !search || h.input_text?.toLowerCase().includes(search.toLowerCase()) ||
+    h.case_type?.toLowerCase().includes(search.toLowerCase())
+  );
 
-  const formatDate = (d) =>
-    new Date(d).toLocaleString("en-IN", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
+  const fmt = (d) => new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  const fmtTime = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 
-  const bailStyle = (pct) => {
-    if (pct == null) return "";
-    if (pct >= 65) return "bg-emerald-500/10 border-emerald-500/25 text-emerald-400";
-    if (pct >= 35) return "bg-yellow-500/10 border-yellow-500/25 text-yellow-400";
-    return "bg-red-500/10 border-red-500/25 text-red-400";
-  };
+  // ── Not logged in ──
+  if (!user) return (
+    <div className="min-h-screen bg-[#08091a] flex flex-col items-center justify-center text-center px-6 pt-20">
+      <div className="w-20 h-20 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center mb-6">
+        <FileText size={36} className="text-yellow-400" />
+      </div>
+      <h2 className="text-white font-serif text-2xl font-bold mb-3">Login to View History</h2>
+      <p className="text-slate-400 text-sm max-w-xs mb-6">Sign in to save and access your past legal case analyses.</p>
+      <button onClick={onBack} className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-yellow-500 text-slate-900 font-bold hover:bg-yellow-400 transition-all">
+        <ArrowLeft size={16} /> Go Back
+      </button>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-[#08091a] pt-20 pb-16 text-white">
-      <div className="max-w-3xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-[#08091a] pt-20 pb-16">
 
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-slate-500 hover:text-yellow-400 transition-colors text-sm font-semibold px-3 py-2 rounded-xl hover:bg-yellow-500/8 border border-transparent hover:border-yellow-500/20"
-          >
-            <ArrowLeft size={16} /> Back
+      {/* ── Top bar ── */}
+      <div className="max-w-3xl mx-auto px-4 mb-6">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack}
+            className="flex items-center gap-2 text-slate-500 hover:text-yellow-400 transition-colors text-sm font-semibold px-3 py-2 rounded-xl hover:bg-yellow-500/8 border border-transparent hover:border-yellow-500/20">
+            <ArrowLeft size={15} /> Back
           </button>
           <div className="w-px h-5 bg-white/10" />
           <div className="flex items-center gap-2">
             <Clock size={16} className="text-yellow-400" />
-            <h1 className="text-white font-serif font-bold text-xl">
-              Report History
-            </h1>
+            <h1 className="text-white font-serif font-bold text-lg">Case History</h1>
           </div>
-          <span className="ml-auto text-xs text-slate-500 bg-white/5 border border-white/8 px-3 py-1.5 rounded-full tabular-nums">
-            {reports.length} report{reports.length !== 1 ? "s" : ""}
+          <span className="ml-auto text-xs text-slate-500 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+            {history.length} case{history.length !== 1 ? "s" : ""}
           </span>
         </div>
+      </div>
+
+      <div className="max-w-3xl mx-auto px-4 space-y-4">
+
+        {/* Search */}
+        <div className="relative">
+          <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by case type or keywords..."
+            className="w-full bg-[#0d1020] border border-white/8 focus:border-yellow-500/40 rounded-2xl pl-10 pr-4 py-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none transition-all"
+          />
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/25">
+            <AlertCircle size={14} className="text-red-400 shrink-0" />
+            <p className="text-red-300 text-xs">{error}</p>
+          </div>
+        )}
 
         {/* Loading */}
         {loading && (
-          <div className="flex flex-col items-center justify-center py-28 gap-4">
-            <Loader2 size={36} className="text-yellow-500 animate-spin" />
-            <p className="text-slate-500 text-sm">Loading your reports…</p>
+          <div className="flex items-center justify-center py-20">
+            <Loader2 size={28} className="text-yellow-400 animate-spin" />
           </div>
         )}
 
-        {/* Error */}
-        {!loading && error && (
-          <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6 flex items-center gap-3">
-            <AlertTriangle size={18} className="text-red-400 shrink-0" />
-            <p className="text-red-300 text-sm">{error}</p>
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!loading && !error && reports.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-28 gap-4 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-white/4 border border-white/8 flex items-center justify-center">
-              <FileText size={28} className="text-slate-600" />
+        {/* Empty */}
+        {!loading && filtered.length === 0 && (
+          <div className="text-center py-24">
+            <div className="w-16 h-16 rounded-2xl bg-white/4 border border-white/8 flex items-center justify-center mx-auto mb-4">
+              <FileText size={24} className="text-slate-600" />
             </div>
-            <p className="text-slate-300 font-bold text-lg">No reports yet</p>
-            <p className="text-slate-600 text-sm max-w-xs leading-relaxed">
-              Go to{" "}
-              <strong className="text-slate-400">Analyze</strong>, describe
-              your case and click{" "}
-              <strong className="text-slate-400">Analyze</strong> to generate
-              your first report.
+            <p className="text-slate-400 font-semibold">
+              {search ? "No cases match your search" : "No cases analyzed yet"}
             </p>
-            <button
-              onClick={onBack}
-              className="mt-3 px-6 py-2.5 rounded-2xl bg-yellow-500 text-slate-900 font-bold text-sm hover:bg-yellow-400 transition-all shadow-lg shadow-yellow-500/20"
-            >
-              Analyze a Case
-            </button>
+            <p className="text-slate-600 text-sm mt-1">
+              {search ? "Try different keywords" : "Analyze a case to see it here"}
+            </p>
+            {!search && (
+              <button onClick={onBack}
+                className="mt-5 px-5 py-2.5 rounded-xl bg-yellow-500 text-slate-900 font-bold text-sm hover:bg-yellow-400 transition-all">
+                Analyze a Case
+              </button>
+            )}
           </div>
         )}
 
-        {/* Report list */}
-        {!loading && !error && reports.length > 0 && (
-          <div className="flex flex-col gap-3">
-            {reports.map((r) => (
-              <div
-                key={r.id}
-                onClick={() => handleOpen(r)}
-                className="group bg-[#0d1020] border border-white/8 hover:border-yellow-500/25 rounded-2xl p-5 cursor-pointer transition-all hover:shadow-[0_0_24px_rgba(234,179,8,0.06)] active:scale-[0.99]"
-              >
-                <div className="flex items-start gap-4">
+        {/* History list */}
+        {!loading && filtered.map((item) => {
+          const bc = getBailColor(item.bail_pct);
+          return (
+            <div key={item.id}
+              className="group bg-[#0d1020] border border-white/8 hover:border-yellow-500/20 rounded-2xl p-5 transition-all">
+              <div className="flex items-start gap-4">
 
-                  {/* Scale icon */}
-                  <div className="w-11 h-11 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                    <Scale size={20} className="text-yellow-400" />
+                {/* Icon */}
+                <div className="w-11 h-11 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                  <Gavel size={18} className="text-yellow-400" />
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-white font-bold text-sm">{item.case_type || "Criminal"}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${bc.bg} ${bc.text}`}>
+                      {item.bail_pct}% Bail
+                    </span>
                   </div>
-
-                  {/* Main content */}
-                  <div className="flex-1 min-w-0">
-                    {/* Badges */}
-                    <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                      {r.case_type && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 uppercase tracking-wide">
-                          {r.case_type}
-                        </span>
-                      )}
-                      {r.bail_pct != null && (
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${bailStyle(
-                            r.bail_pct
-                          )}`}
-                        >
-                          Bail {r.bail_pct}%
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Query preview */}
-                    <p className="text-slate-300 text-sm leading-snug line-clamp-2 mb-2">
-                      {r.input_text?.trim() || "No description provided"}
-                    </p>
-
-                    {/* Date */}
-                    <p className="text-slate-600 text-xs">
-                      {formatDate(r.created_at)}
-                    </p>
+                  <p className="text-slate-400 text-xs leading-snug line-clamp-2 mb-2">
+                    {item.input_text || "No query text"}
+                  </p>
+                  <div className="flex items-center gap-3 text-xs text-slate-600">
+                    <span className="flex items-center gap-1">
+                      <Clock size={10} /> {fmt(item.created_at)}
+                    </span>
+                    <span>{fmtTime(item.created_at)}</span>
                   </div>
+                </div>
 
-                  {/* Delete + arrow */}
-                  <div className="flex items-center gap-1 shrink-0 self-center">
-                    <button
-                      onClick={(e) => handleDelete(e, r.id)}
-                      disabled={deleting === r.id}
-                      title="Delete report"
-                      className="p-2 rounded-xl text-slate-700 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all disabled:opacity-40"
-                    >
-                      {deleting === r.id ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={14} />
-                      )}
-                    </button>
-                    <ChevronRight
-                      size={16}
-                      className="text-slate-700 group-hover:text-yellow-400 transition-colors"
-                    />
-                  </div>
-
+                {/* Actions */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => onViewReport({ aiResponse: item.ai_response, inputText: item.input_text, timestamp: new Date(item.created_at).getTime() })}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 hover:bg-yellow-500 hover:text-slate-900 hover:border-yellow-500 font-bold text-xs transition-all"
+                  >
+                    View <ChevronRight size={13} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(item.id)}
+                    disabled={deleting === item.id}
+                    className="p-2 rounded-xl text-slate-600 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all"
+                  >
+                    {deleting === item.id
+                      ? <Loader2 size={14} className="animate-spin" />
+                      : <Trash2 size={14} />
+                    }
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-
+            </div>
+          );
+        })}
       </div>
     </div>
   );
