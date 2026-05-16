@@ -151,7 +151,10 @@ export default function App() {
   if (activeView === "alerts") return (
     <div className="min-h-screen bg-[#08091a] font-sans text-white">
       {sharedNavbar}
-      <AlertsView onBack={() => setActiveView("home")} />
+      <AlertsView
+        onBack={() => setActiveView("home")}
+        onViewReport={handleViewReport}
+      />
       {authModal}
     </div>
   );
