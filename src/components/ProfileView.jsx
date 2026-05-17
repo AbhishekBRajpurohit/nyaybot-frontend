@@ -9,22 +9,23 @@ import { useAuth } from "./AuthContext";
 const API = "http://localhost:4000";
 
 export default function ProfileView({ onBack, onViewReport }) {
-  const { user, logout }           = useAuth();
-  const [profile, setProfile]      = useState(null);
-  const [loading, setLoading]      = useState(true);
-  const [error, setError]          = useState("");
-  const [success, setSuccess]      = useState("");
+  const { user, logout }              = useAuth();
+  const [profile, setProfile]         = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState("");
+  const [success, setSuccess]         = useState("");
 
   // Name edit
-  const [editName, setEditName]    = useState(false);
-  const [newName, setNewName]      = useState("");
-  const [savingName, setSavingName]= useState(false);
+  const [editName, setEditName]       = useState(false);
+  const [newName, setNewName]         = useState("");
+  const [savingName, setSavingName]   = useState(false);
 
   // Phone edit
-  const [editPhone, setEditPhone]  = useState(false);
-  const [newPhone, setNewPhone]    = useState("");
+  const [editPhone, setEditPhone]     = useState(false);
+  const [newPhone, setNewPhone]       = useState("");
   const [savingPhone, setSavingPhone] = useState(false);
 
+  // ── Load profile ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) { setLoading(false); return; }
     fetch(`${API}/api/profile`, { credentials: "include" })
@@ -38,18 +39,14 @@ export default function ProfileView({ onBack, onViewReport }) {
       .catch(() => { setError("Failed to load profile."); setLoading(false); });
   }, [user]);
 
-  // ── Save name ────────────────────────────────────────────────────────────
+  // ── Save name ──────────────────────────────────────────────────────────────
   const handleSaveName = async () => {
-    if (!newName.trim() || newName.trim().length < 2) {
-      setError("Name must be at least 2 characters."); return;
-    }
+    if (!newName.trim() || newName.trim().length < 2) { setError("Name must be at least 2 characters."); return; }
     setSavingName(true); setError("");
     try {
-      const res = await fetch(`${API}/api/profile/name`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ name: newName.trim() }),
+      const res  = await fetch(`${API}/api/profile/name`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        credentials: "include", body: JSON.stringify({ name: newName.trim() }),
       });
       const data = await res.json();
       if (data.error) { setError(data.error); return; }
@@ -61,29 +58,27 @@ export default function ProfileView({ onBack, onViewReport }) {
     finally { setSavingName(false); }
   };
 
-  // ── Save phone ───────────────────────────────────────────────────────────
+  // ── Save phone ─────────────────────────────────────────────────────────────
   const handleSavePhone = async () => {
-    const cleaned = newPhone.replace(/\s/g, "");
-    if (!cleaned) { setError("Please enter a phone number."); return; }
-    // Validate Indian number format
-    if (!/^\+?[0-9]{10,15}$/.test(cleaned)) {
-      setError("Enter a valid phone number (e.g. +919876543210)"); return;
-    }
+    const digits = newPhone.replace(/\D/g, "");
+    if (!digits || digits.length < 10) { setError("Enter a valid 10-digit phone number."); return; }
+    const formatted = digits.startsWith("91") && digits.length === 12
+      ? `+${digits}`
+      : `+91${digits.slice(-10)}`;
     setSavingPhone(true); setError("");
     try {
-      const res = await fetch(`${API}/api/profile/phone`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ phone: cleaned.startsWith("+") ? cleaned : `+91${cleaned}` }),
+      const res  = await fetch(`${API}/api/profile/phone`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        credentials: "include", body: JSON.stringify({ phone: formatted }),
       });
       const data = await res.json();
       if (data.error) { setError(data.error); return; }
       setProfile(prev => ({ ...prev, user: { ...prev.user, phone_number: data.user.phone_number } }));
+      setNewPhone(data.user.phone_number || "");
       setEditPhone(false);
       setSuccess("✅ Phone saved! You'll receive SMS & WhatsApp court reminders.");
-      setTimeout(() => setSuccess(""), 4000);
-    } catch { setError("Failed to update phone."); }
+      setTimeout(() => setSuccess(""), 5000);
+    } catch { setError("Failed to save phone."); }
     finally { setSavingPhone(false); }
   };
 
@@ -91,23 +86,17 @@ export default function ProfileView({ onBack, onViewReport }) {
 
   const fmt      = d => new Date(d).toLocaleDateString("en-IN", { day:"2-digit", month:"long",  year:"numeric" });
   const fmtShort = d => new Date(d).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" });
-
-  const getBailColor = (pct) => {
-    if (pct >= 65) return "text-emerald-400";
-    if (pct >= 35) return "text-yellow-400";
-    return "text-red-400";
-  };
+  const getBailColor = pct => pct >= 65 ? "text-emerald-400" : pct >= 35 ? "text-yellow-400" : "text-red-400";
 
   // ── Not logged in ──────────────────────────────────────────────────────────
   if (!user) return (
     <div className="min-h-screen bg-[#08091a] flex flex-col items-center justify-center text-center px-6 pt-20">
       <div className="w-20 h-20 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center mb-6">
-        <User size={36} className="text-yellow-400" />
+        <User size={36} className="text-yellow-400"/>
       </div>
       <h2 className="text-white font-serif text-2xl font-bold mb-3">Login to View Profile</h2>
       <p className="text-slate-400 text-sm max-w-xs mb-6">Sign in to see your profile and case history.</p>
-      <button onClick={onBack}
-        className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-yellow-500 text-slate-900 font-bold hover:bg-yellow-400 transition-all">
+      <button onClick={onBack} className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-yellow-500 text-slate-900 font-bold hover:bg-yellow-400 transition-all">
         <ArrowLeft size={16}/> Go Back
       </button>
     </div>
@@ -119,8 +108,7 @@ export default function ProfileView({ onBack, onViewReport }) {
       {/* Top bar */}
       <div className="max-w-2xl mx-auto px-4 mb-6">
         <div className="flex items-center gap-3">
-          <button onClick={onBack}
-            className="flex items-center gap-2 text-slate-500 hover:text-yellow-400 transition-colors text-sm font-semibold px-3 py-2 rounded-xl hover:bg-yellow-500/8 border border-transparent hover:border-yellow-500/20">
+          <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-yellow-400 transition-colors text-sm font-semibold px-3 py-2 rounded-xl hover:bg-yellow-500/8 border border-transparent hover:border-yellow-500/20">
             <ArrowLeft size={15}/> Back
           </button>
           <div className="w-px h-5 bg-white/10"/>
@@ -131,12 +119,12 @@ export default function ProfileView({ onBack, onViewReport }) {
 
       <div className="max-w-2xl mx-auto px-4 space-y-5">
 
-        {/* Error / Success */}
+        {/* Alerts */}
         {error && (
           <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/25">
             <AlertCircle size={14} className="text-red-400 shrink-0"/>
-            <p className="text-red-300 text-sm">{error}</p>
-            <button onClick={()=>setError("")} className="ml-auto text-red-500 hover:text-red-300"><X size={14}/></button>
+            <p className="text-red-300 text-sm flex-1">{error}</p>
+            <button onClick={()=>setError("")}><X size={14} className="text-red-500 hover:text-red-300"/></button>
           </div>
         )}
         {success && (
@@ -166,16 +154,16 @@ export default function ProfileView({ onBack, onViewReport }) {
                     </div>
                   )}
                   <div className={`mt-2 text-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    profile?.user?.provider === "google"
+                    profile?.user?.provider==="google"
                       ? "bg-blue-500/15 border-blue-500/25 text-blue-400"
                       : "bg-white/8 border-white/15 text-slate-400"
                   }`}>
-                    {profile?.user?.provider === "google" ? "Google" : "Email"}
+                    {profile?.user?.provider==="google"?"Google":"Email"}
                   </div>
                 </div>
 
                 {/* Info */}
-                <div className="flex-1 min-w-0 space-y-4">
+                <div className="flex-1 min-w-0 space-y-3">
 
                   {/* Name */}
                   <div>
@@ -208,7 +196,7 @@ export default function ProfileView({ onBack, onViewReport }) {
                   {/* Email */}
                   <div className="flex items-center gap-2 text-sm">
                     <Mail size={14} className="text-yellow-500/60 shrink-0"/>
-                    <span className="text-slate-400">{profile?.user?.email}</span>
+                    <span className="text-slate-400 truncate">{profile?.user?.email}</span>
                   </div>
 
                   {/* Member since */}
@@ -234,36 +222,37 @@ export default function ProfileView({ onBack, onViewReport }) {
                 <Phone size={16} className="text-yellow-400"/>
                 <h3 className="text-white font-bold text-base">Phone Number</h3>
                 <span className="ml-auto text-xs text-slate-500 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">
-                  For SMS & WhatsApp alerts
+                  SMS & WhatsApp alerts
                 </span>
               </div>
 
-              {/* Info banner */}
+              {/* Info */}
               <div className="flex items-start gap-2.5 p-3 rounded-xl bg-yellow-500/8 border border-yellow-500/20 mb-4">
                 <Bell size={13} className="text-yellow-400 shrink-0 mt-0.5"/>
                 <p className="text-slate-400 text-xs leading-relaxed">
-                  Add your number to receive <strong className="text-white">SMS + WhatsApp</strong> court reminders
-                  automatically — 1 day before and 30 minutes before every hearing you set an alert for.
+                  Add your number to receive <strong className="text-white">SMS + WhatsApp</strong> court
+                  reminders — 1 day before and 30 minutes before every hearing.
                 </p>
               </div>
 
               {editPhone ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2 shrink-0">
-                      <span className="text-lg">🇮🇳</span>
+                    <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 shrink-0">
+                      <span className="text-base">🇮🇳</span>
                       <span className="text-white text-sm font-semibold">+91</span>
                     </div>
                     <input
                       type="tel"
-                      value={newPhone.replace(/^\+91/, "")}
-                      onChange={e => setNewPhone(e.target.value.replace(/\D/g,""))}
+                      value={newPhone.replace(/^\+91/, "").replace(/\D/g,"")}
+                      onChange={e => setNewPhone(e.target.value.replace(/\D/g,"").slice(0,10))}
                       placeholder="9876543210"
                       maxLength={10}
                       autoFocus
                       className="flex-1 bg-white/5 border border-yellow-500/40 rounded-xl px-4 py-2.5 text-white text-sm placeholder-slate-600 focus:outline-none transition-all"
                     />
                   </div>
+                  <p className="text-slate-600 text-xs">Enter your 10-digit mobile number without country code</p>
                   <div className="flex gap-2">
                     <button onClick={handleSavePhone} disabled={savingPhone}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-yellow-500 text-slate-900 font-bold text-sm hover:bg-yellow-400 transition-all disabled:opacity-60">
@@ -287,15 +276,18 @@ export default function ProfileView({ onBack, onViewReport }) {
                     {profile?.user?.phone_number ? (
                       <div>
                         <p className="text-white font-semibold text-sm">{profile.user.phone_number}</p>
-                        <p className="text-emerald-400 text-xs">✅ SMS & WhatsApp alerts enabled</p>
+                        <p className="text-emerald-400 text-xs mt-0.5">✅ SMS & WhatsApp reminders enabled</p>
                       </div>
                     ) : (
-                      <p className="text-slate-500 text-sm">No phone number added yet</p>
+                      <div>
+                        <p className="text-slate-500 text-sm">No phone number added</p>
+                        <p className="text-slate-600 text-xs mt-0.5">Add to receive court reminders via SMS & WhatsApp</p>
+                      </div>
                     )}
                   </div>
                   <button
-                    onClick={()=>setEditPhone(true)}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-yellow-500/10 border border-yellow-500/25 text-yellow-400 hover:bg-yellow-500 hover:text-slate-900 hover:border-yellow-500 font-bold text-sm transition-all"
+                    onClick={()=>{ setEditPhone(true); setNewPhone(profile?.user?.phone_number?.replace(/^\+91/,"")||""); }}
+                    className="flex items-center gap-1.5 px-4 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/25 text-yellow-400 hover:bg-yellow-500 hover:text-slate-900 hover:border-yellow-500 font-bold text-sm transition-all whitespace-nowrap"
                   >
                     <Edit2 size={13}/> {profile?.user?.phone_number?"Edit":"Add"}
                   </button>
