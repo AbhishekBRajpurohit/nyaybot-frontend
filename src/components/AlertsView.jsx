@@ -1,63 +1,46 @@
 import React, { useState, useEffect } from "react";
 import {
   ArrowLeft, Bell, Plus, Trash2, Calendar, Clock,
-  Loader2, AlertCircle, CheckCircle, X, BellRing,
-  Link, FileText
+  Loader2, AlertCircle, CheckCircle, X, BellRing, FileText
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
-import { useAlerts } from "./AlertsContext";
+import { useAlerts, getDaysUntilDate, fmtTime, fmtDate } from "./AlertsContext";
 
 const API = "http://localhost:4000";
 
-function getDaysUntil(dateStr) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const target = new Date(dateStr); target.setHours(0, 0, 0, 0);
-  return Math.round((target - today) / 86400000);
-}
-
+// ── Uses the fixed getDaysUntilDate (no UTC / midnight bug) ──────────────────
 function getUrgency(days) {
-  if (days < 0)   return { label: "Past",     color: "text-slate-500",  bg: "bg-slate-500/10  border-slate-500/20",  dot: "bg-slate-500"            };
-  if (days === 0) return { label: "TODAY",    color: "text-red-400",    bg: "bg-red-500/10    border-red-500/25",    dot: "bg-red-400 animate-pulse" };
-  if (days === 1) return { label: "Tomorrow", color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/25", dot: "bg-orange-400 animate-pulse" };
-  if (days <= 7)  return { label: `${days}d`, color: "text-yellow-400", bg: "bg-yellow-500/10  border-yellow-500/25", dot: "bg-yellow-400"           };
-  return           { label: `${days}d`, color: "text-slate-400",  bg: "bg-white/5       border-white/10",     dot: "bg-slate-500"            };
-}
-
-function fmtTime(t) {
-  if (!t) return "";
-  const [h, m] = t.split(":");
-  const hour = parseInt(h);
-  return `${hour > 12 ? hour - 12 : hour || 12}:${m} ${hour >= 12 ? "PM" : "AM"}`;
-}
-
-function fmtDate(d) {
-  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  if (days < 0)   return { label: "Past",      color: "text-slate-500",  bg: "bg-slate-500/10  border-slate-500/20",  dot: "bg-slate-500"             };
+  if (days === 0) return { label: "TODAY",     color: "text-red-400",    bg: "bg-red-500/10    border-red-500/25",    dot: "bg-red-400 animate-pulse"  };
+  if (days === 1) return { label: "Tomorrow",  color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/25", dot: "bg-orange-400 animate-pulse"};
+  if (days <= 7)  return { label: `In ${days} days`, color: "text-yellow-400", bg: "bg-yellow-500/10 border-yellow-500/25", dot: "bg-yellow-400"      };
+  return           { label: `In ${days} days`, color: "text-slate-400",  bg: "bg-white/5       border-white/10",     dot: "bg-slate-500"             };
 }
 
 export default function AlertsView({ onBack, onViewReport }) {
   const { user }                          = useAuth();
   const { alerts, addAlert, removeAlert } = useAlerts();
 
-  const [history, setHistory]   = useState([]); // past cases to link from
-  const [showForm, setShowForm] = useState(false);
-  const [deleting, setDeleting] = useState(null);
-  const [saving, setSaving]     = useState(false);
-  const [error, setError]       = useState("");
-  const [success, setSuccess]   = useState("");
+  const [history, setHistory]             = useState([]);
+  const [showForm, setShowForm]           = useState(false);
+  const [deleting, setDeleting]           = useState(null);
+  const [saving, setSaving]               = useState(false);
+  const [error, setError]                 = useState("");
+  const [success, setSuccess]             = useState("");
 
-  // Form
-  const [caseName, setCaseName]       = useState("");
-  const [courtDate, setCourtDate]     = useState("");
-  const [courtTime, setCourtTime]     = useState("");
-  const [notes, setNotes]             = useState("");
-  const [linkedHistoryId, setLinkedHistoryId] = useState(""); // link to a case
+  // form fields
+  const [caseName, setCaseName]           = useState("");
+  const [courtDate, setCourtDate]         = useState("");
+  const [courtTime, setCourtTime]         = useState("");
+  const [notes, setNotes]                 = useState("");
+  const [linkedHistoryId, setLinkedHistoryId] = useState("");
 
-  // Fetch history so user can link an alert to a case
+  // fetch history for linking
   useEffect(() => {
     if (!user) return;
     fetch(`${API}/api/history`, { credentials: "include" })
       .then(r => r.json())
-      .then(data => setHistory(data.history || []))
+      .then(d => setHistory(d.history || []))
       .catch(() => {});
   }, [user]);
 
@@ -66,11 +49,10 @@ export default function AlertsView({ onBack, onViewReport }) {
     setNotes(""); setLinkedHistoryId("");
   };
 
-  // When user picks a linked case — auto-fill case name
-  const handleLinkCase = (historyId) => {
-    setLinkedHistoryId(historyId);
-    if (historyId) {
-      const found = history.find(h => String(h.id) === String(historyId));
+  const handleLinkCase = (id) => {
+    setLinkedHistoryId(id);
+    if (id) {
+      const found = history.find(h => String(h.id) === id);
       if (found) setCaseName(found.input_text?.slice(0, 60) || found.case_type || "");
     }
   };
@@ -87,19 +69,15 @@ export default function AlertsView({ onBack, onViewReport }) {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          caseName: caseName.trim(),
-          courtDate,
-          courtTime,
-          notes,
-          historyId: linkedHistoryId || null,
+          caseName: caseName.trim(), courtDate, courtTime,
+          notes, historyId: linkedHistoryId || null,
         }),
       });
       const data = await res.json();
       if (data.error) { setError(data.error); return; }
       addAlert(data.alert);
-      resetForm();
-      setShowForm(false);
-      setSuccess("✅ Alert set! You'll be notified on the Home page before your hearing.");
+      resetForm(); setShowForm(false);
+      setSuccess("✅ Alert set! You'll be notified 1 day before and 30 minutes before the hearing.");
       setTimeout(() => setSuccess(""), 5000);
     } catch { setError("Failed to add alert."); }
     finally { setSaving(false); }
@@ -114,7 +92,7 @@ export default function AlertsView({ onBack, onViewReport }) {
     finally { setDeleting(null); }
   };
 
-  // ── Not logged in ──
+  // ── Not logged in ──────────────────────────────────────────────────────────
   if (!user) return (
     <div className="min-h-screen bg-[#08091a] flex flex-col items-center justify-center text-center px-6 pt-20">
       <div className="w-20 h-20 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center mb-6">
@@ -136,7 +114,7 @@ export default function AlertsView({ onBack, onViewReport }) {
 
       {/* ── Top bar ── */}
       <div className="max-w-3xl mx-auto px-4 mb-6">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <button onClick={onBack}
             className="flex items-center gap-2 text-slate-500 hover:text-yellow-400 transition-colors text-sm font-semibold px-3 py-2 rounded-xl hover:bg-yellow-500/8 border border-transparent hover:border-yellow-500/20">
             <ArrowLeft size={15} /> Back
@@ -144,7 +122,7 @@ export default function AlertsView({ onBack, onViewReport }) {
           <div className="w-px h-5 bg-white/10" />
           <BellRing size={16} className="text-yellow-400" />
           <h1 className="text-white font-serif font-bold text-xl">Court Date Alerts</h1>
-          <span className="ml-1 text-sm text-slate-500 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+          <span className="text-sm text-slate-500 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
             {alerts.length} alert{alerts.length !== 1 ? "s" : ""}
           </span>
           <button
@@ -158,23 +136,24 @@ export default function AlertsView({ onBack, onViewReport }) {
 
       <div className="max-w-3xl mx-auto px-4 space-y-4">
 
-        {/* Info banner */}
-        <div className="flex items-center gap-3 p-3.5 rounded-xl bg-yellow-500/8 border border-yellow-500/20">
-          <Bell size={15} className="text-yellow-400 shrink-0" />
+        {/* Info */}
+        <div className="flex items-start gap-3 p-3.5 rounded-xl bg-yellow-500/8 border border-yellow-500/20">
+          <Bell size={15} className="text-yellow-400 shrink-0 mt-0.5" />
           <p className="text-slate-400 text-sm leading-relaxed">
-            Alerts notify you via <strong className="text-white">browser popup</strong> and <strong className="text-white">in-app toast</strong> within 24 hours of your hearing — even on the Home page.
+            You will receive <strong className="text-white">2 notifications</strong> per alert —
+            one <strong className="text-white">1 day before</strong> and one
+            <strong className="text-white"> 30 minutes before</strong> the hearing — as both
+            browser popup and in-app toast on any page.
           </p>
         </div>
 
-        {/* Success */}
+        {/* Success / Error */}
         {success && (
           <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
             <CheckCircle size={14} className="text-emerald-400 shrink-0" />
             <p className="text-emerald-300 text-sm">{success}</p>
           </div>
         )}
-
-        {/* Error */}
         {error && (
           <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/25">
             <AlertCircle size={14} className="text-red-400 shrink-0" />
@@ -196,16 +175,16 @@ export default function AlertsView({ onBack, onViewReport }) {
             </div>
 
             <div className="space-y-3">
-              {/* Link to a case from history */}
+              {/* Link to history case */}
               {history.length > 0 && (
                 <div>
-                  <label className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1.5 block flex items-center gap-1.5">
-                    <Link size={11} /> Link to Existing Case (optional)
+                  <label className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1.5 block">
+                    Link to Existing Case (optional)
                   </label>
                   <select
                     value={linkedHistoryId}
                     onChange={e => handleLinkCase(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 focus:border-yellow-500/50 rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition-all appearance-none"
+                    className="w-full bg-white/5 border border-white/10 focus:border-yellow-500/50 rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition-all"
                   >
                     <option value="">— Select a case from history —</option>
                     {history.map(h => (
@@ -215,9 +194,9 @@ export default function AlertsView({ onBack, onViewReport }) {
                     ))}
                   </select>
                   {linkedHistoryId && (
-                    <div className="mt-1.5 flex items-center gap-1.5 text-emerald-400 text-xs">
-                      <CheckCircle size={11} /> Linked to case — alert will show report when clicked
-                    </div>
+                    <p className="mt-1 text-emerald-400 text-xs flex items-center gap-1">
+                      <CheckCircle size={11} /> Linked — "View case report" will appear on this alert
+                    </p>
                   )}
                 </div>
               )}
@@ -226,7 +205,7 @@ export default function AlertsView({ onBack, onViewReport }) {
               <div>
                 <label className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1.5 block">Case Name *</label>
                 <input type="text" value={caseName} onChange={e => setCaseName(e.target.value)}
-                  placeholder="e.g. IPC 379 Theft Case — Sessions Court"
+                  placeholder="e.g. IPC 379 Theft Case — Sessions Court Bengaluru"
                   className="w-full bg-white/5 border border-white/10 focus:border-yellow-500/50 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none transition-all" />
               </div>
 
@@ -263,14 +242,14 @@ export default function AlertsView({ onBack, onViewReport }) {
           </div>
         )}
 
-        {/* Empty */}
+        {/* Empty state */}
         {alerts.length === 0 && !showForm && (
           <div className="text-center py-24">
             <div className="w-16 h-16 rounded-2xl bg-white/4 border border-white/8 flex items-center justify-center mx-auto mb-4">
               <Bell size={28} className="text-slate-600" />
             </div>
             <p className="text-slate-400 font-semibold text-lg">No court alerts set</p>
-            <p className="text-slate-600 text-base mt-1">Add your hearing dates to get reminded</p>
+            <p className="text-slate-600 text-base mt-1">Add hearing dates to get notified automatically</p>
             <button onClick={() => setShowForm(true)}
               className="mt-5 px-5 py-2.5 rounded-xl bg-yellow-500 text-slate-900 font-bold text-sm hover:bg-yellow-400 transition-all">
               Add First Alert
@@ -280,9 +259,9 @@ export default function AlertsView({ onBack, onViewReport }) {
 
         {/* Alerts list */}
         {alerts.map(alert => {
-          const days = getDaysUntil(alert.court_date);
+          // ── FIX: use getDaysUntilDate (no midnight rollover bug) ──
+          const days = getDaysUntilDate(alert.court_date);
           const u    = getUrgency(days);
-          // Find linked history case
           const linked = alert.history_id
             ? history.find(h => String(h.id) === String(alert.history_id))
             : null;
@@ -290,11 +269,13 @@ export default function AlertsView({ onBack, onViewReport }) {
           return (
             <div key={alert.id}
               className={`bg-[#0d1020] border rounded-2xl p-5 transition-all ${
-                days >= 0 && days <= 1 ? "border-orange-500/30" : "border-white/8 hover:border-yellow-500/20"
+                days >= 0 && days <= 1
+                  ? "border-orange-500/30"
+                  : "border-white/8 hover:border-yellow-500/20"
               }`}>
               <div className="flex items-start gap-4">
 
-                {/* Urgency dot */}
+                {/* Urgency dot + line */}
                 <div className="flex flex-col items-center gap-1 pt-1.5 shrink-0">
                   <div className={`w-3.5 h-3.5 rounded-full ${u.dot}`} />
                   <div className="w-px h-8 bg-white/8" />
@@ -323,7 +304,17 @@ export default function AlertsView({ onBack, onViewReport }) {
                     <p className="text-slate-500 text-sm mb-1.5 leading-snug">{alert.notes}</p>
                   )}
 
-                  {/* Linked case badge */}
+                  {/* Notification schedule info */}
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    <span className="text-[11px] text-slate-600 bg-white/4 border border-white/8 px-2 py-0.5 rounded-full">
+                      🔔 1 day before
+                    </span>
+                    <span className="text-[11px] text-slate-600 bg-white/4 border border-white/8 px-2 py-0.5 rounded-full">
+                      🔔 30 min before
+                    </span>
+                  </div>
+
+                  {/* Linked case */}
                   {linked && (
                     <button
                       onClick={() => onViewReport && onViewReport({
@@ -331,7 +322,7 @@ export default function AlertsView({ onBack, onViewReport }) {
                         inputText: linked.input_text,
                         timestamp: new Date(linked.created_at).getTime(),
                       })}
-                      className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-lg transition-all mt-1"
+                      className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-lg transition-all mt-2"
                     >
                       <FileText size={11} /> View linked case report
                     </button>
