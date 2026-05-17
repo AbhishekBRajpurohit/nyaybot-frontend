@@ -114,11 +114,37 @@ export default function Navbar({ activeView = "home", onNavigate, lang = "en", l
                 <ChevronDown size={13} className={`text-slate-400 transition-transform ${userOpen ? "rotate-180" : ""}`} />
               </button>
               {userOpen && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-[#141929] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
+                <div className="absolute right-0 top-full mt-2 w-52 bg-[#141929] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
+                  {/* User info */}
                   <div className="px-4 py-3 border-b border-white/8">
-                    <p className="text-white text-sm font-semibold truncate">{user.name}</p>
-                    <p className="text-slate-500 text-xs truncate">{user.email}</p>
+                    <div className="flex items-center gap-2.5">
+                      {user.avatar
+                        ? <img src={user.avatar} alt="" className="w-8 h-8 rounded-xl object-cover"/>
+                        : <div className="w-8 h-8 rounded-xl bg-yellow-500 flex items-center justify-center text-slate-900 font-bold text-sm">{user.name?.[0]?.toUpperCase()}</div>
+                      }
+                      <div className="min-w-0">
+                        <p className="text-white text-sm font-semibold truncate">{user.name}</p>
+                        <p className="text-slate-500 text-xs truncate">{user.email}</p>
+                      </div>
+                    </div>
                   </div>
+                  {/* Profile link */}
+                  <button
+                    onClick={() => { onNavigate("profile"); setUserOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors border-b border-white/8"
+                  >
+                    <User size={14} className="text-yellow-400" /> My Profile
+                  </button>
+                  {/* Phone number status */}
+                  <div className="px-4 py-2.5 border-b border-white/8">
+                    <p className="text-slate-600 text-xs">
+                      {user.phone_number
+                        ? <span className="text-emerald-400">📱 {user.phone_number}</span>
+                        : <span className="text-orange-400 cursor-pointer" onClick={() => { onNavigate("profile"); setUserOpen(false); }}>⚠️ Add phone for SMS alerts</span>
+                      }
+                    </p>
+                  </div>
+                  {/* Sign out */}
                   <button
                     onClick={() => { logout(); setUserOpen(false); }}
                     className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
