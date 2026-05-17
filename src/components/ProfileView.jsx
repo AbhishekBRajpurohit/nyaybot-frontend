@@ -9,7 +9,7 @@ import { useAuth } from "./AuthContext";
 const API = "http://localhost:4000";
 
 export default function ProfileView({ onBack, onViewReport }) {
-  const { user, logout }              = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const [profile, setProfile]         = useState(null);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState("");
@@ -76,6 +76,7 @@ export default function ProfileView({ onBack, onViewReport }) {
       setProfile(prev => ({ ...prev, user: { ...prev.user, phone_number: data.user.phone_number } }));
       setNewPhone(data.user.phone_number || "");
       setEditPhone(false);
+      await refreshUser(); // update navbar immediately
       setSuccess("✅ Phone saved! You'll receive SMS & WhatsApp court reminders.");
       setTimeout(() => setSuccess(""), 5000);
     } catch { setError("Failed to save phone."); }
