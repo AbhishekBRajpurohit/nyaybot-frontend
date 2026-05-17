@@ -56,6 +56,15 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
+  // ── Refresh user from server ───────────────────────────────────────────
+  const refreshUser = async () => {
+    try {
+      const res = await fetch(`${API}/api/me`, { credentials: "include" });
+      const data = await res.json();
+      if (data.user) setUser(data.user);
+    } catch (_) {}
+  };
+
   // ── Google OAuth ───────────────────────────────────────────────────────
   const loginWithGoogle = () => {
     window.location.href = `${API}/auth/google`;
@@ -68,7 +77,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, loginWithGoogle, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
