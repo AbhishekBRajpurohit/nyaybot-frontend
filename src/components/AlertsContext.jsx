@@ -11,36 +11,51 @@ const API = "http://localhost:4000";
 
 function fmtTime(t) {
   if (!t) return "";
-  const [h, m] = t.split(":");
-  const hr = parseInt(h);
-  return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? "PM" : "AM"}`;
+  // handle "HH:MM:SS" or "HH:MM"
+  const parts = t.split(":");
+  const hr = parseInt(parts[0]);
+  const min = parts[1] || "00";
+  return `${hr > 12 ? hr - 12 : hr || 12}:${min} ${hr >= 12 ? "PM" : "AM"}`;
+}
+
+// Safely extract YYYY-MM-DD from any date format (ISO, postgres timestamp, plain date)
+function extractDateStr(d) {
+  if (!d) return "";
+  const s = String(d);
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // ISO timestamp like 2026-05-17T00:00:00.000Z or 2026-05-17T00:00:00
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (m) return m[1];
+  return s;
 }
 
 function fmtDate(d) {
-  return new Date(d + "T00:00:00").toLocaleDateString("en-IN", {
+  const dateStr = extractDateStr(d);
+  if (!dateStr) return "—";
+  const [y, mo, day] = dateStr.split("-").map(Number);
+  return new Date(y, mo - 1, day).toLocaleDateString("en-IN", {
     day: "2-digit", month: "short", year: "numeric",
   });
 }
 
-// Compare DATES only (ignore time) — fixes midnight rollover bug
-function getDaysUntilDate(dateStr) {
+// Compare DATES only — fixes midnight rollover + postgres timestamp bug
+function getDaysUntilDate(rawDate) {
+  const dateStr = extractDateStr(rawDate);
+  if (!dateStr) return NaN;
   const now    = new Date();
-  const todayY = now.getFullYear();
-  const todayM = now.getMonth();
-  const todayD = now.getDate();
-
-  // Parse as local date (avoid UTC shift)
+  const todayMs  = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const [y, mo, d] = dateStr.split("-").map(Number);
-
-  const todayMs  = new Date(todayY, todayM, todayD).getTime();
   const targetMs = new Date(y, mo - 1, d).getTime();
-
   return Math.round((targetMs - todayMs) / 86_400_000);
 }
 
 // ms until a specific future moment; null if already past
-function msUntil(dateStr, timeStr, subtractMs = 0) {
-  const hearing = new Date(`${dateStr}T${timeStr}`).getTime();
+function msUntil(rawDate, timeStr, subtractMs = 0) {
+  const dateStr = extractDateStr(rawDate);
+  if (!dateStr || !timeStr) return null;
+  const timeClean = timeStr.split(":").slice(0,2).join(":");
+  const hearing = new Date(`${dateStr}T${timeClean}`).getTime();
   const trigger = hearing - subtractMs;
   const diff    = trigger - Date.now();
   return diff > 0 ? diff : null;
