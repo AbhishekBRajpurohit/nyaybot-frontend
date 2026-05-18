@@ -173,462 +173,418 @@ function LawyerCard({ lawyer }) {
   );
 }
 
-// ─── PDF Generator — Professional Legal Document Style ───────────────────────
+
+// ─── PDF Generator — Professional Legal Document ─────────────────────────────
 function generatePDF(data, fmtFull) {
   try {
-    const doc    = new jsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
-    const W      = doc.internal.pageSize.getWidth();   // 210
-    const H      = doc.internal.pageSize.getHeight();  // 297
-    const mL     = 18; // left margin
-    const mR     = 18; // right margin
-    const mT     = 20; // top margin
-    const cW     = W - mL - mR; // content width
-    let   y      = mT;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const W   = doc.internal.pageSize.getWidth();
+    const H   = doc.internal.pageSize.getHeight();
+    const mL  = 18;
+    const mR  = 18;
+    const cW  = W - mL - mR;
+    let y     = 20;
 
-    // ── Helpers ───────────────────────────────────────────────────────────
-    const nl   = (n=5)  => { y += n; };
-    const newPage = ()  => {
+    // ── Safe color setters (no spread) ──────────────────────────────────
+    const fc = (r,g,b)   => doc.setFillColor(r,g,b);
+    const tc = (r,g,b)   => doc.setTextColor(r,g,b);
+    const dc = (r,g,b)   => doc.setDrawColor(r,g,b);
+    const fs = (s,st="normal") => { doc.setFontSize(s); doc.setFont("helvetica",st); };
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+    const nl = (n=5) => { y += n; };
+
+    const addFooter = () => {
+      const p = doc.internal.getNumberOfPages();
+      dc(212,160,23); doc.setLineWidth(0.3);
+      doc.line(mL, H-12, W-mR, H-12);
+      fs(7); tc(140,110,30);
+      doc.text("NyayBot AI  |  Justice Made Understandable  |  nyaybot.in", mL, H-7);
+      doc.text(`Page ${p}`, W-mR, H-7, { align: "right" });
+      tc(150,150,150);
+      doc.text("This report does not constitute legal advice.", W/2, H-7, { align: "center" });
+    };
+
+    const newPage = () => {
       addFooter();
       doc.addPage();
-      // White background
-      doc.setFillColor(255,255,255);
-      doc.rect(0,0,W,H,"F");
-      y = mT + 5;
-    };
-    const chk  = (n=15) => { if (y + n > H - 18) newPage(); };
-
-    // Divider line
-    const hr = (color=[180,160,80], thickness=0.4) => {
-      doc.setDrawColor(...color);
-      doc.setLineWidth(thickness);
-      doc.line(mL, y, W-mR, y);
-      nl(4);
+      fc(255,255,255); doc.rect(0,0,W,H,"F");
+      y = 25;
     };
 
-    // Thin light divider
+    const chk = (n=15) => { if (y + n > H - 18) newPage(); };
+
+    const hrGold = () => {
+      dc(212,160,23); doc.setLineWidth(0.3);
+      doc.line(mL, y, W-mR, y); nl(4);
+    };
+
     const hrLight = () => {
-      doc.setDrawColor(220,220,220);
-      doc.setLineWidth(0.2);
-      doc.line(mL, y, W-mR, y);
-      nl(4);
+      dc(220,220,220); doc.setLineWidth(0.2);
+      doc.line(mL, y, W-mR, y); nl(4);
     };
 
-    // Section heading
     const sectionHead = (title) => {
-      chk(16);
-      nl(2);
-      // Gold left border bar
-      doc.setFillColor(212,160,23);
-      doc.rect(mL, y-3, 3, 6, "F");
-      doc.setFontSize(9); doc.setFont("helvetica","bold");
-      doc.setTextColor(30,30,30);
-      doc.text(title, mL+6, y+1);
-      nl(8);
-      // Underline
-      doc.setDrawColor(212,160,23); doc.setLineWidth(0.3);
-      doc.line(mL, y, W-mR, y);
-      nl(5);
+      chk(18); nl(3);
+      fc(212,160,23); doc.rect(mL, y-3, 3, 7, "F");
+      fs(9,"bold"); tc(30,30,30);
+      doc.text(title, mL+7, y+1);
+      nl(9); hrGold();
     };
 
-    // Body text
-    const bodyText = (txt, x=mL, size=9, color=[60,60,60], style="normal") => {
-      doc.setFontSize(size); doc.setFont("helvetica", style);
-      doc.setTextColor(...color);
-      const lines = doc.splitTextToSize(String(txt), W-mR-x);
-      lines.forEach(line => {
-        chk(5);
-        doc.text(line, x, y);
-        nl(5);
-      });
+    const multiLine = (text, x, maxW, size=8.5, r=50,g=50,b=50, style="normal") => {
+      fs(size,style); tc(r,g,b);
+      const lines = doc.splitTextToSize(String(text||""), maxW);
+      lines.forEach(line => { chk(6); doc.text(line, x, y); nl(5); });
     };
 
-    // Label + value on same line
-    const labelVal = (label, val, labelColor=[120,100,40], valColor=[30,30,30]) => {
-      chk(6);
-      doc.setFontSize(8); doc.setFont("helvetica","bold"); doc.setTextColor(...labelColor);
-      doc.text(label, mL, y);
-      doc.setFont("helvetica","normal"); doc.setTextColor(...valColor);
-      doc.text(String(val), mL+45, y);
-      nl(5.5);
-    };
+    // ════════════════════════════════════════════════════════════════════
+    // WHITE BACKGROUND
+    // ════════════════════════════════════════════════════════════════════
+    fc(255,255,255); doc.rect(0,0,W,H,"F");
 
-    // Footer on each page
-    const addFooter = () => {
-      const pg = doc.internal.getNumberOfPages();
-      doc.setFontSize(7); doc.setFont("helvetica","normal"); doc.setTextColor(150,150,150);
-      // Gold line above footer
-      doc.setDrawColor(212,160,23); doc.setLineWidth(0.3);
-      doc.line(mL, H-12, W-mR, H-12);
-      doc.text("NyayBot AI  |  Justice Made Understandable  |  nyaybot.in", mL, H-7);
-      doc.text(`Page ${pg}`, W-mR, H-7, {align:"right"});
-      doc.text("This report does not constitute legal advice.", W/2, H-7, {align:"center"});
-    };
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // PAGE 1 — COVER + OVERVIEW
-    // ═══════════════════════════════════════════════════════════════════════
-
-    // White background
-    doc.setFillColor(255,255,255);
-    doc.rect(0,0,W,H,"F");
-
-    // ── Top gold banner ──
-    doc.setFillColor(212,160,23);
-    doc.rect(0,0,W,28,"F");
+    // ── GOLD HEADER BANNER ───────────────────────────────────────────────
+    fc(212,160,23); doc.rect(0,0,W,30,"F");
 
     // Logo circle
-    doc.setFillColor(30,30,30);
-    doc.circle(mL+8, 14, 8, "F");
-    doc.setFontSize(9); doc.setFont("helvetica","bold"); doc.setTextColor(212,160,23);
-    doc.text("NY", mL+4.5, 16);
+    fc(20,20,20); doc.circle(mL+9, 15, 9, "F");
+    fs(8,"bold"); tc(212,160,23);
+    doc.text("NY", mL+5.5, 17);
 
-    // Title in banner
-    doc.setFontSize(18); doc.setFont("helvetica","bold"); doc.setTextColor(255,255,255);
-    doc.text("NyayBot", mL+22, 12);
-    doc.setFontSize(7.5); doc.setFont("helvetica","normal"); doc.setTextColor(30,30,30);
-    doc.text("AI-POWERED LEGAL CASE REPORT", mL+22, 19);
+    // Title
+    fs(20,"bold"); tc(255,255,255);
+    doc.text("NyayBot", mL+24, 13);
+    fs(7.5,"normal"); tc(30,20,0);
+    doc.text("AI-POWERED LEGAL CASE REPORT", mL+24, 21);
 
-    // Date top right in banner
-    doc.setFontSize(7); doc.setTextColor(30,30,30);
-    doc.text(`Generated: ${fmtFull(data.generatedAt)}`, W-mR, 10, {align:"right"});
-    doc.text("CONFIDENTIAL", W-mR, 19, {align:"right"});
+    // Right side of banner
+    fs(7,"normal"); tc(30,20,0);
+    doc.text("Generated: " + fmtFull(data.generatedAt), W-mR, 11, { align:"right" });
+    fs(7,"bold"); tc(20,20,20);
+    doc.text("CONFIDENTIAL", W-mR, 22, { align:"right" });
 
-    y = 36;
+    y = 38;
 
-    // ── Case overview box ──
-    doc.setFillColor(250,247,235);
-    doc.roundedRect(mL, y, cW, 38, 2, 2, "F");
-    doc.setDrawColor(212,160,23); doc.setLineWidth(0.5);
-    doc.roundedRect(mL, y, cW, 38, 2, 2, "S");
+    // ── CASE OVERVIEW BOX ───────────────────────────────────────────────
+    fc(252,248,235); doc.roundedRect(mL, y, cW, 40, 2, 2, "F");
+    dc(212,160,23); doc.setLineWidth(0.5);
+    doc.roundedRect(mL, y, cW, 40, 2, 2, "S");
 
-    // Overview heading inside box
-    doc.setFontSize(8); doc.setFont("helvetica","bold"); doc.setTextColor(120,90,20);
+    fs(8,"bold"); tc(110,80,10);
     doc.text("CASE OVERVIEW", mL+5, y+8);
 
-    // 4-column grid inside box
-    const boxCols = [
-      {label:"Case Type",       val: data.caseType},
-      {label:"Sections Found",  val: String(data.sections.length)},
-      {label:"Est. Timeline",   val: `${data.timeline} months`},
-      {label:"Detention",       val: data.detentionLegal ? "Within Limits" : "Check Required"},
+    // 4 columns inside box
+    const ovCols = [
+      ["Case Type",      data.caseType],
+      ["Sections Found", String(data.sections.length)],
+      ["Est. Timeline",  data.timeline+" months"],
+      ["Detention",      data.detentionLegal ? "Within Limits" : "Check Required"],
     ];
     const colW = cW / 4;
-    boxCols.forEach((col, i) => {
-      const cx = mL + i * colW + 5;
-      doc.setFontSize(7); doc.setFont("helvetica","normal"); doc.setTextColor(130,110,50);
-      doc.text(col.label, cx, y+18);
-      doc.setFontSize(10); doc.setFont("helvetica","bold");
-      doc.setTextColor(i===3 && !data.detentionLegal ? [180,50,50] : i===3 ? [30,120,60] : [30,30,30]);
-      doc.text(col.val, cx, y+28);
+    ovCols.forEach(([label, val], i) => {
+      const cx = mL + i*colW + 5;
+      fs(7,"normal"); tc(130,100,30);
+      doc.text(label, cx, y+19);
+      fs(10,"bold");
+      if (i === 3) {
+        data.detentionLegal ? tc(20,130,60) : tc(185,28,28);
+      } else {
+        tc(20,20,20);
+      }
+      doc.text(val, cx, y+30);
     });
 
-    // Vertical dividers inside box
-    for(let i=1; i<4; i++) {
-      doc.setDrawColor(212,160,23); doc.setLineWidth(0.2);
-      doc.line(mL+i*colW, y+12, mL+i*colW, y+35);
+    // Column dividers
+    for (let i=1; i<4; i++) {
+      dc(212,160,23); doc.setLineWidth(0.2);
+      doc.line(mL + i*colW, y+12, mL + i*colW, y+37);
     }
-    y += 44;
+    y += 47;
 
-    // ── Your Query ──
+    // ── YOUR QUERY ───────────────────────────────────────────────────────
     if (data.inputQuery) {
       chk(20);
-      nl(3);
-      doc.setFillColor(245,245,245);
-      const qlines = doc.splitTextToSize(data.inputQuery, cW-10);
-      const qH = qlines.length * 5 + 14;
-      doc.roundedRect(mL, y, cW, qH, 2, 2, "F");
-      doc.setFontSize(7); doc.setFont("helvetica","bold"); doc.setTextColor(120,100,40);
-      doc.text("YOUR QUERY", mL+5, y+7);
-      doc.setFontSize(9); doc.setFont("helvetica","normal"); doc.setTextColor(40,40,40);
-      qlines.forEach((line, i) => doc.text(line, mL+5, y+14+(i*5)));
-      y += qH + 6;
+      nl(2);
+      fs(7,"bold"); tc(120,90,20);
+      doc.text("YOUR QUERY", mL, y); nl(5);
+      fc(245,245,245); dc(200,190,160); doc.setLineWidth(0.3);
+      const qLines = doc.splitTextToSize(data.inputQuery, cW-6);
+      const qH = qLines.length * 5 + 10;
+      doc.roundedRect(mL, y-3, cW, qH, 2, 2, "FD");
+      fs(9,"normal"); tc(30,30,30);
+      qLines.forEach(l => { doc.text(l, mL+4, y+1); nl(5); });
+      y += 5;
     }
 
-    // ── Plain Language Summary ──
+    // ── PLAIN LANGUAGE SUMMARY ───────────────────────────────────────────
     sectionHead("PLAIN-LANGUAGE SUMMARY");
-    bodyText(data.summary, mL, 9, [50,50,50]);
+    multiLine(data.summary, mL, cW, 9, 40,40,40);
     nl(2);
 
-    // ── Bail Probability ──
+    // ── BAIL PROBABILITY ─────────────────────────────────────────────────
     sectionHead("BAIL PROBABILITY ASSESSMENT");
+    chk(38);
 
-    // Bail box
-    const bailBoxH = 32;
-    chk(bailBoxH+5);
-    const bailBg = data.bailColor==="emerald"?[235,250,242]:data.bailColor==="yellow"?[253,248,225]:[253,235,235];
-    const bailAccent = data.bailColor==="emerald"?[22,163,74]:data.bailColor==="yellow"?[161,120,0]:[185,28,28];
-    doc.setFillColor(...bailBg);
-    doc.roundedRect(mL, y, cW, bailBoxH, 2, 2, "F");
-    doc.setDrawColor(...bailAccent); doc.setLineWidth(0.5);
-    doc.roundedRect(mL, y, cW, bailBoxH, 2, 2, "S");
+    // Color based on bail
+    let bailR=22,bailG=163,bailB=74; // green
+    let bgR=235,bgG=250,bgB=242;
+    if (data.bailColor==="yellow") { bailR=161;bailG=120;bailB=0; bgR=253;bgG=248;bgB=225; }
+    if (data.bailColor==="red")    { bailR=185;bailG=28; bailB=28;bgR=253;bgG=235;bgB=235; }
 
-    // Big percentage
-    doc.setFontSize(30); doc.setFont("helvetica","bold"); doc.setTextColor(...bailAccent);
-    doc.text(`${data.bailPct}%`, mL+8, y+22);
+    fc(bgR,bgG,bgB); dc(bailR,bailG,bailB); doc.setLineWidth(0.5);
+    doc.roundedRect(mL, y, cW, 35, 2, 2, "FD");
+
+    // Big %
+    fs(32,"bold"); tc(bailR,bailG,bailB);
+    doc.text(data.bailPct+"%", mL+8, y+24);
 
     // Label
-    doc.setFontSize(11); doc.setFont("helvetica","bold"); doc.setTextColor(...bailAccent);
-    doc.text(data.bailLabel, mL+40, y+14);
+    fs(11,"bold"); tc(bailR,bailG,bailB);
+    doc.text(data.bailLabel, mL+42, y+13);
 
-    // Progress bar
-    doc.setFillColor(220,220,220);
-    doc.roundedRect(mL+40, y+17, cW-50, 5, 1, 1, "F");
-    doc.setFillColor(...bailAccent);
-    doc.roundedRect(mL+40, y+17, (cW-50)*(data.bailPct/100), 5, 1, 1, "F");
+    // Progress bar background
+    fc(210,210,210);
+    doc.roundedRect(mL+42, y+16, cW-52, 5, 1,1, "F");
+    // Progress bar fill
+    fc(bailR,bailG,bailB);
+    doc.roundedRect(mL+42, y+16, (cW-52)*(data.bailPct/100), 5, 1,1, "F");
 
     // Reasoning
-    doc.setFontSize(7.5); doc.setFont("helvetica","normal"); doc.setTextColor(...bailAccent);
-    doc.text("Based on AI analysis of case details. Consult a lawyer for accurate assessment.", mL+40, y+27);
+    fs(7.5,"normal"); tc(bailR,bailG,bailB);
+    doc.text("AI-based assessment. Consult a qualified lawyer for accurate evaluation.", mL+42, y+27);
 
-    y += bailBoxH + 8;
+    y += 42;
 
-    // Reasoning bullets
     if (data.sections.some(s=>s.bailable)) {
-      chk(6); doc.setFontSize(8); doc.setFont("helvetica","normal"); doc.setTextColor(22,120,60);
-      doc.text("[+] All identified offences are bailable under IPC.", mL+3, y); nl(5);
+      chk(6); fs(8,"normal"); tc(22,120,60);
+      doc.text("[+]  All identified offences are bailable under IPC.", mL+2, y); nl(6);
     }
     if (data.sections.some(s=>!s.bailable)) {
-      chk(6); doc.setFontSize(8); doc.setFont("helvetica","normal"); doc.setTextColor(180,40,40);
-      doc.text("[-] Non-bailable offences identified — court discretion required.", mL+3, y); nl(5);
+      chk(6); fs(8,"normal"); tc(185,28,28);
+      doc.text("[-]  Non-bailable offences found - court discretion required.", mL+2, y); nl(6);
     }
     nl(2);
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // LEGAL SECTIONS
-    // ═══════════════════════════════════════════════════════════════════════
+    // ── LEGAL SECTIONS ───────────────────────────────────────────────────
     if (data.sections.length > 0) {
       sectionHead("IDENTIFIED LEGAL SECTIONS");
+
       // Table header
-      doc.setFillColor(212,160,23);
-      doc.rect(mL, y, cW, 7, "F");
-      doc.setFontSize(7.5); doc.setFont("helvetica","bold"); doc.setTextColor(255,255,255);
-      doc.text("Section Code", mL+3, y+5);
-      doc.text("Description", mL+38, y+5);
-      doc.text("Status", W-mR-20, y+5);
-      nl(7);
+      fc(212,160,23); doc.rect(mL, y, cW, 8, "F");
+      fs(7.5,"bold"); tc(255,255,255);
+      doc.text("Section",    mL+4,    y+5.5);
+      doc.text("Description",mL+38,   y+5.5);
+      doc.text("Status",     W-mR-22, y+5.5);
+      nl(8);
 
       data.sections.forEach((sec, i) => {
-        chk(8);
-        if (i % 2 === 0) {
-          doc.setFillColor(249,246,235);
-          doc.rect(mL, y-3, cW, 8, "F");
-        }
-        doc.setFontSize(8); doc.setFont("helvetica","bold"); doc.setTextColor(120,90,20);
-        doc.text(sec.code, mL+3, y+2);
-        doc.setFont("helvetica","normal"); doc.setTextColor(40,40,40);
-        doc.text(sec.name, mL+38, y+2);
-        const statusColor = sec.bailable ? [22,120,60] : [185,28,28];
-        doc.setFont("helvetica","bold"); doc.setTextColor(...statusColor);
-        doc.text(sec.bailable?"Bailable":"Non-Bailable", W-mR-20, y+2);
-        nl(8);
+        chk(10);
+        if (i%2===0) { fc(249,246,235); dc(235,225,200); doc.setLineWidth(0.1); doc.rect(mL, y-3, cW, 9, "FD"); }
+        fs(8,"bold");   tc(120,90,20);    doc.text(sec.code, mL+4, y+2);
+        fs(8,"normal"); tc(40,40,40);     doc.text(sec.name, mL+38, y+2);
+        fs(7.5,"bold");
+        sec.bailable ? tc(22,120,60) : tc(185,28,28);
+        doc.text(sec.bailable?"Bailable":"Non-Bailable", W-mR-22, y+2);
+        nl(9);
       });
       nl(3);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // DETENTION + TIMELINE
-    // ═══════════════════════════════════════════════════════════════════════
+    // ── DETENTION + TIMELINE ─────────────────────────────────────────────
     sectionHead("ILLEGAL DETENTION CHECK & TIMELINE");
-    chk(18);
-    const detColor = data.detentionLegal ? [22,120,60] : [185,28,28];
-    const detBg    = data.detentionLegal ? [235,250,242] : [253,235,235];
-    doc.setFillColor(...detBg);
-    doc.roundedRect(mL, y, cW/2-3, 16, 2, 2, "F");
-    doc.setFontSize(8); doc.setFont("helvetica","bold"); doc.setTextColor(...detColor);
-    doc.text("Detention Status", mL+4, y+6);
-    doc.setFont("helvetica","normal"); doc.setFontSize(8);
-    doc.text(data.detentionLegal?"Within Legal Limits":"Potentially Illegal", mL+4, y+12);
+    chk(22);
 
-    doc.setFillColor(245,245,245);
-    doc.roundedRect(mL+cW/2+3, y, cW/2-3, 16, 2, 2, "F");
-    doc.setFontSize(8); doc.setFont("helvetica","bold"); doc.setTextColor(100,80,20);
-    doc.text("Estimated Timeline", mL+cW/2+7, y+6);
-    doc.setFont("helvetica","normal"); doc.setTextColor(40,40,40);
-    doc.text(`~${data.timeline} months to resolution`, mL+cW/2+7, y+12);
-    y += 22;
+    // Left box - detention
+    if (data.detentionLegal) { fc(235,250,242); dc(22,120,60); }
+    else                     { fc(253,235,235); dc(185,28,28); }
+    doc.setLineWidth(0.4);
+    doc.roundedRect(mL, y, cW/2-3, 18, 2,2, "FD");
+    fs(7.5,"bold"); data.detentionLegal ? tc(22,120,60) : tc(185,28,28);
+    doc.text("Detention Status", mL+4, y+7);
+    fs(8,"normal"); tc(30,30,30);
+    doc.text(data.detentionLegal?"Within Legal Limits":"Potentially Illegal", mL+4, y+14);
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // HEARINGS
-    // ═══════════════════════════════════════════════════════════════════════
+    // Right box - timeline
+    fc(245,245,245); dc(200,190,160); doc.setLineWidth(0.3);
+    doc.roundedRect(mL+cW/2+3, y, cW/2-3, 18, 2,2, "FD");
+    fs(7.5,"bold"); tc(100,80,20);
+    doc.text("Estimated Timeline", mL+cW/2+7, y+7);
+    fs(8,"normal"); tc(30,30,30);
+    doc.text("~"+data.timeline+" months to resolution", mL+cW/2+7, y+14);
+
+    y += 25;
+
+    // ── UPCOMING HEARINGS ────────────────────────────────────────────────
     sectionHead("UPCOMING HEARINGS");
     data.hearings.forEach((h, i) => {
-      chk(9);
-      const ds  = h.date.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
+      chk(11);
+      const ds     = h.date.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
       const isPast = h.date < new Date();
-      const isNext = !isPast && i === data.hearings.findIndex(x => !x.past);
+      const isNext = !isPast && i===data.hearings.findIndex(x=>!x.past);
 
+      // Highlight next hearing
       if (isNext) {
-        doc.setFillColor(255,248,220);
-        doc.roundedRect(mL, y-3, cW, 9, 1, 1, "F");
-        doc.setDrawColor(212,160,23); doc.setLineWidth(0.3);
-        doc.roundedRect(mL, y-3, cW, 9, 1, 1, "S");
+        fc(255,248,220); dc(212,160,23); doc.setLineWidth(0.3);
+        doc.roundedRect(mL, y-3, cW, 10, 1,1, "FD");
       }
 
-      // Bullet
-      doc.setFillColor(isPast?[180,180,180]:isNext?[212,160,23]:[50,130,200]);
-      doc.circle(mL+3, y+1, 1.5, "F");
+      // Dot
+      if (isPast)      { fc(180,180,180); }
+      else if (isNext) { fc(212,160,23);  }
+      else             { fc(50,130,200);  }
+      doc.circle(mL+4, y+1.5, 2, "F");
 
-      doc.setFontSize(8.5);
-      doc.setFont("helvetica", isNext?"bold":"normal");
-      doc.setTextColor(isPast?150:30, isPast?150:30, isPast?150:30);
-      doc.text(h.label, mL+8, y+2);
+      fs(8.5, isNext?"bold":"normal");
+      isPast ? tc(150,150,150) : tc(30,30,30);
+      doc.text(h.label, mL+10, y+2.5);
 
-      doc.setFont("helvetica","bold");
-      doc.setTextColor(isPast?150:isNext?120:50, isPast?150:isNext?90:50, isPast?150:isNext?20:50);
-      doc.text(ds, W-mR-35, y+2);
+      fs(8.5,"bold");
+      isPast ? tc(150,150,150) : tc(80,60,10);
+      doc.text(ds, W-mR-35, y+2.5);
 
       if (isNext) {
-        doc.setFontSize(6.5); doc.setFont("helvetica","bold"); doc.setTextColor(160,120,0);
-        doc.text("NEXT HEARING", W-mR-5, y+2, {align:"right"});
+        fs(6.5,"bold"); tc(150,110,0);
+        doc.text("NEXT", W-mR-4, y+2.5, {align:"right"});
       }
+      nl(10);
+    });
+    nl(2);
+
+    // ── YOUR LEGAL RIGHTS ────────────────────────────────────────────────
+    sectionHead("YOUR LEGAL RIGHTS");
+    data.rights.forEach((right, i) => {
+      chk(10);
+      // Number badge
+      fc(212,160,23); doc.circle(mL+4, y+0.5, 3, "F");
+      fs(6.5,"bold"); tc(255,255,255);
+      doc.text(String(i+1), mL+4, y+1.8, {align:"center"});
+
+      // Right text
+      const rLines = doc.splitTextToSize(right, cW-12);
+      fs(8.5,"normal"); tc(35,35,35);
+      rLines.forEach((line, li) => {
+        chk(6);
+        doc.text(line, mL+11, y+(li===0?1.5:0));
+        if (li < rLines.length-1) nl(5);
+      });
       nl(9);
     });
     nl(2);
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // LEGAL RIGHTS
-    // ═══════════════════════════════════════════════════════════════════════
-    sectionHead("YOUR LEGAL RIGHTS");
-    data.rights.forEach((right, i) => {
-      chk(8);
-      // Number badge
-      doc.setFillColor(212,160,23);
-      doc.circle(mL+3, y+0.5, 2.5, "F");
-      doc.setFontSize(6.5); doc.setFont("helvetica","bold"); doc.setTextColor(255,255,255);
-      doc.text(String(i+1), mL+3, y+1.5, {align:"center"});
-
-      const rlines = doc.splitTextToSize(right, cW-12);
-      doc.setFontSize(8.5); doc.setFont("helvetica","normal"); doc.setTextColor(40,40,40);
-      rlines.forEach((line, li) => {
-        chk(5);
-        doc.text(line, mL+9, y+(li===0?1:0));
-        if (li < rlines.length-1) nl(5);
-      });
-      nl(8);
-    });
-    nl(2);
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // AI ANALYSIS
-    // ═══════════════════════════════════════════════════════════════════════
+    // ── AI ANALYSIS ──────────────────────────────────────────────────────
     sectionHead("FULL AI LEGAL ANALYSIS");
 
-    // Clean AI text — remove markdown, emojis and special chars
     const cleanAI = (data.aiText || "No AI analysis available.")
       .replace(/\*\*/g,"").replace(/\*/g,"")
-      .replace(/#{1,4}\s/g,"")
+      .replace(/#{1,4}\s?/g,"")
       .replace(/`/g,"")
-      .replace(/[^\x00-\x7F]/g," ") // remove all non-ASCII (emojis etc)
+      .replace(/[^\x00-\x7F]/g," ")  // strip all emojis & non-ASCII
       .replace(/\s+/g," ")
       .trim();
 
     const aiParas = cleanAI.split(/\n+/).filter(p => p.trim().length > 3);
     aiParas.forEach(para => {
-      chk(10);
-      const isHeading = para.length < 60 && !para.endsWith(".");
-      if (isHeading) {
-        nl(2);
-        doc.setFontSize(9); doc.setFont("helvetica","bold"); doc.setTextColor(80,60,20);
-        const pLines = doc.splitTextToSize(para, cW);
-        pLines.forEach(l => { chk(5); doc.text(l, mL, y); nl(5); });
+      chk(12);
+      const isHead = para.length < 70 && !para.trim().endsWith(".");
+      if (isHead) {
+        nl(2); fs(9,"bold"); tc(70,50,10);
+        const hl = doc.splitTextToSize(para, cW);
+        hl.forEach(l => { chk(6); doc.text(l, mL, y); nl(5); });
       } else {
-        const pLines = doc.splitTextToSize(para, cW);
-        doc.setFontSize(8.5); doc.setFont("helvetica","normal"); doc.setTextColor(50,50,50);
-        pLines.forEach(l => { chk(5); doc.text(l, mL, y); nl(5); });
+        fs(8.5,"normal"); tc(45,45,45);
+        const pl = doc.splitTextToSize(para, cW);
+        pl.forEach(l => { chk(5); doc.text(l, mL, y); nl(5); });
       }
       nl(1);
     });
     nl(3);
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // RECOMMENDED LAWYERS
-    // ═══════════════════════════════════════════════════════════════════════
+    // ── RECOMMENDED LAWYERS ──────────────────────────────────────────────
     sectionHead("RECOMMENDED LAWYERS NEAR YOU");
 
     data.lawyers.forEach((lw, i) => {
-      chk(38);
-      const lwBoxH = lw.proBono ? 36 : 32;
+      chk(40);
+      const boxH = 38;
 
-      // Alternating backgrounds
-      doc.setFillColor(i%2===0 ? [252,249,240] : [248,252,248]);
-      doc.roundedRect(mL, y, cW, lwBoxH, 2, 2, "F");
-      doc.setDrawColor(200,190,160); doc.setLineWidth(0.3);
-      doc.roundedRect(mL, y, cW, lwBoxH, 2, 2, "S");
+      // Card background alternating
+      i%2===0 ? fc(252,249,240) : fc(248,252,248);
+      dc(200,190,160); doc.setLineWidth(0.3);
+      doc.roundedRect(mL, y, cW, boxH, 2,2, "FD");
 
-      // Left gold accent strip
-      doc.setFillColor(212,160,23);
-      doc.roundedRect(mL, y, 3, lwBoxH, 1, 1, "F");
+      // Gold left strip
+      fc(212,160,23); doc.rect(mL, y, 3.5, boxH, "F");
 
       // Number badge
-      doc.setFillColor(30,30,30);
-      doc.circle(mL+12, y+8, 5, "F");
-      doc.setFontSize(8); doc.setFont("helvetica","bold"); doc.setTextColor(212,160,23);
-      doc.text(String(i+1), mL+12, y+10, {align:"center"});
+      fc(20,20,20); doc.circle(mL+13, y+9, 6, "F");
+      fs(8,"bold"); tc(212,160,23);
+      doc.text(String(i+1), mL+13, y+11.5, {align:"center"});
 
       // Name
-      doc.setFontSize(10); doc.setFont("helvetica","bold"); doc.setTextColor(20,20,20);
-      doc.text(lw.name, mL+22, y+9);
+      fs(10,"bold"); tc(15,15,15);
+      doc.text(lw.name, mL+24, y+10);
 
-      // Pro bono badge
+      // Pro Bono badge
       if (lw.proBono) {
-        doc.setFillColor(22,120,60);
-        doc.roundedRect(W-mR-22, y+4, 20, 6, 1, 1, "F");
-        doc.setFontSize(6); doc.setFont("helvetica","bold"); doc.setTextColor(255,255,255);
-        doc.text("PRO BONO", W-mR-18, y+8.5, {align:"center"});
+        fc(22,120,60); doc.roundedRect(W-mR-24, y+4, 22, 7, 1,1, "F");
+        fs(6,"bold"); tc(255,255,255);
+        doc.text("PRO BONO", W-mR-20.5, y+9, {align:"center"});
       }
 
       // Specialisation
-      doc.setFontSize(8); doc.setFont("helvetica","normal"); doc.setTextColor(80,70,40);
-      doc.text(`${lw.spec}  |  ${lw.area}`, mL+22, y+15);
+      fs(8,"normal"); tc(80,65,30);
+      doc.text(lw.spec+"  |  "+lw.area, mL+24, y+17);
 
-      // Rating row
-      doc.setFontSize(7.5); doc.setFont("helvetica","normal"); doc.setTextColor(60,60,60);
-      doc.text(`Rating: ${lw.rating}  |  ${lw.cases} cases  |  ${lw.success}% success  |  ${lw.exp} yrs exp`, mL+22, y+21);
+      // Stats row
+      fs(7.5,"normal"); tc(55,55,55);
+      doc.text(
+        "Rating: "+lw.rating+"   |   "+lw.cases+" cases   |   "+lw.success+"% success   |   "+lw.exp+" yrs exp",
+        mL+24, y+24
+      );
 
-      // Contact row
-      doc.text(`Languages: ${lw.langs}`, mL+22, y+27);
-      doc.setFont("helvetica","bold"); doc.setTextColor(120,90,20);
-      doc.text(lw.fee+"/hearing", W-mR-38, y+27);
-      doc.setFont("helvetica","normal"); doc.setTextColor(60,60,60);
-      doc.text(`Ph: ${lw.phone}`, W-mR-38, y+33);
+      // Contact
+      fs(7.5,"normal"); tc(55,55,55);
+      doc.text("Languages: "+lw.langs, mL+24, y+30);
+      fs(7.5,"bold"); tc(110,80,10);
+      doc.text(lw.fee+"/hearing", W-mR-45, y+24);
+      fs(7.5,"normal"); tc(55,55,55);
+      doc.text("Ph: "+lw.phone, W-mR-45, y+30);
 
-      y += lwBoxH + 5;
+      y += boxH + 5;
     });
 
-    nl(4);
+    nl(5);
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // DISCLAIMER
-    // ═══════════════════════════════════════════════════════════════════════
-    chk(22);
-    doc.setFillColor(255,245,230);
-    doc.roundedRect(mL, y, cW, 20, 2, 2, "F");
-    doc.setDrawColor(200,130,30); doc.setLineWidth(0.4);
-    doc.roundedRect(mL, y, cW, 20, 2, 2, "S");
-    doc.setFontSize(7.5); doc.setFont("helvetica","bold"); doc.setTextColor(150,80,0);
-    doc.text("IMPORTANT DISCLAIMER", mL+5, y+7);
-    doc.setFont("helvetica","normal"); doc.setTextColor(100,60,0);
-    const discText = "This report is generated by NyayBot AI for informational purposes only and does not constitute legal advice. Always consult a qualified and licensed advocate for your specific legal situation. Bail probability estimates are indicative and may vary.";
-    const discLines = doc.splitTextToSize(discText, cW-10);
-    discLines.forEach((line, i) => doc.text(line, mL+5, y+13+(i*4)));
-    y += 25;
+    // ── DISCLAIMER ───────────────────────────────────────────────────────
+    chk(24);
+    fc(255,245,225); dc(200,130,30); doc.setLineWidth(0.4);
+    doc.roundedRect(mL, y, cW, 22, 2,2, "FD");
+    fs(8,"bold"); tc(150,80,0);
+    doc.text("IMPORTANT DISCLAIMER", mL+5, y+8);
+    fs(7.5,"normal"); tc(100,60,0);
+    const disc = doc.splitTextToSize(
+      "This report is generated by NyayBot AI for informational purposes only and does not constitute legal advice. "+
+      "Always consult a qualified and licensed advocate for your specific legal situation. "+
+      "Bail probability estimates are indicative and may vary based on court discretion.",
+      cW-10
+    );
+    disc.forEach((l,i) => doc.text(l, mL+5, y+14+(i*4)));
+    y += 27;
 
-    // ── Add footer to all pages ──
-    const totalPages = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
-      doc.setPage(i);
-      // Footer gold line
-      doc.setDrawColor(212,160,23); doc.setLineWidth(0.4);
+    // ── ADD FOOTER TO ALL PAGES ──────────────────────────────────────────
+    const total = doc.internal.getNumberOfPages();
+    for (let p=1; p<=total; p++) {
+      doc.setPage(p);
+      dc(212,160,23); doc.setLineWidth(0.4);
       doc.line(mL, H-13, W-mR, H-13);
-      doc.setFontSize(7); doc.setFont("helvetica","normal"); doc.setTextColor(120,100,40);
+      fs(7,"normal"); tc(130,100,30);
       doc.text("NyayBot AI  |  Justice Made Understandable  |  nyaybot.in", mL, H-7);
-      doc.setTextColor(150,150,150);
-      doc.text("This report does not constitute legal advice.", W/2, H-7, {align:"center"});
-      doc.setTextColor(120,100,40);
-      doc.text(`Page ${i} of ${totalPages}`, W-mR, H-7, {align:"right"});
+      tc(150,150,150);
+      doc.text("Report does not constitute legal advice.", W/2, H-7, {align:"center"});
+      tc(130,100,30);
+      doc.text("Page "+p+" of "+total, W-mR, H-7, {align:"right"});
     }
 
-    doc.save(`NyayBot-Legal-Report-${new Date().toISOString().slice(0,10)}.pdf`);
+    doc.save("NyayBot-Legal-Report-"+new Date().toISOString().slice(0,10)+".pdf");
     return true;
   } catch(err) {
     console.error("PDF error:", err);
