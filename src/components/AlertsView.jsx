@@ -9,12 +9,24 @@ import { useAlerts, getDaysUntilDate, fmtTime, fmtDate } from "./AlertsContext";
 const API = "http://localhost:4000";
 
 // ── Uses the fixed getDaysUntilDate (no UTC / midnight bug) ──────────────────
-function getUrgency(days) {
-  if (days < 0)   return { label: "Past",      color: "text-slate-500",  bg: "bg-slate-500/10  border-slate-500/20",  dot: "bg-slate-500"             };
-  if (days === 0) return { label: "TODAY",     color: "text-red-400",    bg: "bg-red-500/10    border-red-500/25",    dot: "bg-red-400 animate-pulse"  };
-  if (days === 1) return { label: "Tomorrow",  color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/25", dot: "bg-orange-400 animate-pulse"};
-  if (days <= 7)  return { label: `In ${days} days`, color: "text-yellow-400", bg: "bg-yellow-500/10 border-yellow-500/25", dot: "bg-yellow-400"      };
-  return           { label: `In ${days} days`, color: "text-slate-400",  bg: "bg-white/5       border-white/10",     dot: "bg-slate-500"             };
+function getUrgency(days, courtTime) {
+  if (days < 0) return { label:"Past",      color:"text-slate-500",  bg:"bg-slate-500/10  border-slate-500/20",  dot:"bg-slate-500" };
+
+  // Today — check if hearing time already passed
+  if (days === 0 && courtTime) {
+    const [h, m] = courtTime.split(":").map(Number);
+    const now = new Date();
+    const hearingMs = new Date();
+    hearingMs.setHours(h, m, 0, 0);
+    if (hearingMs < now) {
+      return { label:"Completed", color:"text-slate-500", bg:"bg-slate-500/10 border-slate-500/20", dot:"bg-slate-500" };
+    }
+    return { label:"TODAY", color:"text-red-400", bg:"bg-red-500/10 border-red-500/25", dot:"bg-red-400 animate-pulse" };
+  }
+
+  if (days === 1) return { label:"Tomorrow",        color:"text-orange-400", bg:"bg-orange-500/10 border-orange-500/25", dot:"bg-orange-400 animate-pulse" };
+  if (days <= 7)  return { label:`In ${days} days`, color:"text-yellow-400", bg:"bg-yellow-500/10  border-yellow-500/25", dot:"bg-yellow-400"              };
+  return                  { label:`In ${days} days`, color:"text-slate-400",  bg:"bg-white/5        border-white/10",     dot:"bg-slate-500"                };
 }
 
 export default function AlertsView({ onBack, onViewReport }) {
@@ -115,9 +127,21 @@ export default function AlertsView({ onBack, onViewReport }) {
       {/* ── Top bar ── */}
       <div className="max-w-3xl mx-auto px-4 mb-6">
         <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={onBack}
+          <button
+            onClick={() => {
+              if (showForm) {
+                // First back click — close the form, stay on alerts page
+                setShowForm(false);
+                resetForm();
+                setError("");
+              } else {
+                // Second back click — go to home
+                onBack();
+              }
+            }}
             className="flex items-center gap-2 text-slate-500 hover:text-yellow-400 transition-colors text-sm font-semibold px-3 py-2 rounded-xl hover:bg-yellow-500/8 border border-transparent hover:border-yellow-500/20">
-            <ArrowLeft size={15} /> Back
+            <ArrowLeft size={15} />
+            {showForm ? "Back to Alerts" : "Back"}
           </button>
           <div className="w-px h-5 bg-white/10" />
           <BellRing size={16} className="text-yellow-400" />
@@ -261,7 +285,7 @@ export default function AlertsView({ onBack, onViewReport }) {
         {alerts.map(alert => {
           // ── FIX: use getDaysUntilDate (no midnight rollover bug) ──
           const days = getDaysUntilDate(alert.court_date);
-          const u    = getUrgency(days);
+          const u    = getUrgency(days, alert.court_time);
           const linked = alert.history_id
             ? history.find(h => String(h.id) === String(alert.history_id))
             : null;
