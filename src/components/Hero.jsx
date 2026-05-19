@@ -169,6 +169,7 @@ export default function Hero({
   const [aiResponse, setAiResponse] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [previewImage, setPreviewImage] = useState(null); // lightbox
 
   const textareaRef = useRef(null);
   const videoRef = useRef(null);
@@ -334,7 +335,7 @@ export default function Hero({
       const response = await callGroq({ text, images });
       setAiResponse(response);
 
-      // Detect case type and bail
+      // Detect case type
       const combined = response + " " + text;
       let caseType = "Criminal";
       if (combined.toLowerCase().includes("pocso") || combined.toLowerCase().includes("posco")) caseType = "POCSO";
@@ -343,7 +344,9 @@ export default function Hero({
       else if (combined.toLowerCase().includes("property")) caseType = "Property";
       else if (combined.toLowerCase().includes("money laundering")) caseType = "Financial";
       else if (combined.toLowerCase().includes("family") || combined.toLowerCase().includes("divorce")) caseType = "Family";
+      else if (combined.toLowerCase().includes("murder") || combined.toLowerCase().includes("302")) caseType = "Murder";
 
+      // Detect bail %
       let bailPct = 65;
       const bailMatch = response.match(/(\d{2,3})\s*%/);
       if (bailMatch) bailPct = Math.min(95, parseInt(bailMatch[1]));
@@ -354,7 +357,7 @@ export default function Hero({
       const reportPayload = { aiResponse: response, inputText: text, timestamp: Date.now() };
       try { localStorage.setItem("nyaybot_report", JSON.stringify(reportPayload)); } catch (_) {}
 
-      // Save to PostgreSQL history (silently — works only if logged in)
+      // Save to history (silently)
       try {
         await fetch("http://localhost:4000/api/history/save", {
           method: "POST",
@@ -362,7 +365,7 @@ export default function Hero({
           credentials: "include",
           body: JSON.stringify({ inputText: text, aiResponse: response, caseType, bailPct }),
         });
-      } catch (_) { /* not logged in — skip */ }
+      } catch (_) {}
 
       if (onReportReady) onReportReady(reportPayload);
     } catch (err) {
@@ -439,7 +442,9 @@ export default function Hero({
               <img
                 src={img.dataUrl}
                 alt="Attached"
-                className="w-16 h-16 rounded-xl object-cover border border-yellow-500/30"
+                className="w-16 h-16 rounded-xl object-cover border border-yellow-500/30 cursor-pointer hover:border-yellow-500/80 hover:scale-105 transition-all"
+                onClick={() => setPreviewImage(img.dataUrl)}
+                title="Click to expand"
               />
               <button
                 onClick={() => removeImage(img.id)}
@@ -654,6 +659,37 @@ export default function Hero({
   if (mode !== "home") {
     return (
       <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0a0a0a] pt-24 pb-16">
+
+        {/* ── Image Lightbox ── */}
+        {previewImage && (
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-sm"
+            onClick={() => setPreviewImage(null)}
+          >
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-all z-10"
+            >
+              <X size={20} />
+            </button>
+            <div
+              className="relative max-w-[90vw] max-h-[90vh] rounded-2xl overflow-hidden shadow-2xl border border-white/10"
+              onClick={e => e.stopPropagation()}
+            >
+              <img
+                src={previewImage}
+                alt="Preview"
+                className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl"
+              />
+              <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm px-4 py-2.5 flex items-center justify-between">
+                <span className="text-white/70 text-xs">Click outside or X to close</span>
+                <button onClick={() => setPreviewImage(null)} className="text-xs text-yellow-400 font-semibold hover:text-yellow-300 transition-colors">
+                  Close Preview
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(212,160,23,0.15)_0%,transparent_65%)]" />
         </div>
@@ -685,6 +721,44 @@ export default function Hero({
 
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0a0a0a] pt-24 pb-16">
+
+      {/* ── Image Lightbox / Preview Modal ── */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-sm"
+          onClick={() => setPreviewImage(null)}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setPreviewImage(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-all z-10"
+          >
+            <X size={20} />
+          </button>
+
+          {/* Image */}
+          <div
+            className="relative max-w-[90vw] max-h-[90vh] rounded-2xl overflow-hidden shadow-2xl border border-white/10"
+            onClick={e => e.stopPropagation()}
+          >
+            <img
+              src={previewImage}
+              alt="Preview"
+              className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl"
+            />
+            {/* Bottom bar */}
+            <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm px-4 py-2.5 flex items-center justify-between">
+              <span className="text-white/70 text-xs">Click outside or X to close</span>
+              <button
+                onClick={() => setPreviewImage(null)}
+                className="text-xs text-yellow-400 font-semibold hover:text-yellow-300 transition-colors"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(212,160,23,0.15)_0%,transparent_65%)]" />
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-[radial-gradient(ellipse_at_bottom,rgba(180,120,0,0.10)_0%,transparent_70%)]" />
