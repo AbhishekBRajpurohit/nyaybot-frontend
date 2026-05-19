@@ -15,10 +15,11 @@ import { LANG_CODES } from "./i18n";
 import { useAuth } from "./components/AuthContext";
 
 export default function App() {
-  const [activeView, setActiveView] = useState("home");
-  const [langLabel, setLangLabel]   = useState("English");
-  const [showAuth, setShowAuth]     = useState(false);
-  const { user }                    = useAuth();
+  const [activeView, setActiveView]   = useState("home");
+  const [previousView, setPreviousView] = useState("home"); // track where we came from
+  const [langLabel, setLangLabel]     = useState("English");
+  const [showAuth, setShowAuth]       = useState(false);
+  const { user }                      = useAuth();
 
   // ── Report state ──────────────────────────────────────────────────────────
   // Only load from localStorage if user is logged in
@@ -46,11 +47,13 @@ export default function App() {
   const lang = LANG_CODES[langLabel] || "en";
 
   const handleReportReady = (data) => {
+    setPreviousView("analyze");
     setReport(data);
     setActiveView("report");
   };
 
   const handleViewReport = (data) => {
+    setPreviousView(activeView); // remember where we came from
     setReport(data);
     setActiveView("report");
   };
@@ -129,7 +132,7 @@ export default function App() {
       <ReportView
         lang={lang}
         report={report}
-        onBack={() => setActiveView("home")}
+        onBack={() => setActiveView(previousView || "home")}
       />
       {authModal}
     </div>
