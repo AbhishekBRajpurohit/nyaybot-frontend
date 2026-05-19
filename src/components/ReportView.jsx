@@ -100,8 +100,8 @@ function parseReportData(aiText, inputText) {
   ];
   const lawyers = [
     { name:"Adv. Rajesh Kumar Sharma", spec:"Criminal, Bail Matters",     area:"MG Road, Bengaluru",       rating:4.8, cases:412, success:78, exp:18, langs:"English, Hindi",          fee:"Rs.3,000-Rs.8,000",  phone:"+91 98451 00021", proBono:false },
-    { name:"Adv. Priya Menon",         spec:"Criminal, Women's Rights",    area:"Civil Lines, Bengaluru",   rating:4.9, cases:287, success:84, exp:12, langs:"English, Hindi",    fee:"Rs.2,500-Rs.6,000",  phone:"+91 99000 00014", proBono:true  },
-    { name:"Adv. Fatima Zaidi",        spec:"Bail, Constitutional",        area:"Cunningham Rd, Bengaluru", rating:4.9, cases:156, success:88, exp:11, langs:"English, Hindi",     fee:"Rs.3,500-Rs.8,000",  phone:"+91 94481 00077", proBono:true  },
+    { name:"Adv. Priya Menon",         spec:"Criminal, Women's Rights",    area:"Civil Lines, Bengaluru",   rating:4.9, cases:287, success:84, exp:12, langs:"English, Hindi, Tamil",    fee:"Rs.2,500-Rs.6,000",  phone:"+91 99000 00014", proBono:true  },
+    { name:"Adv. Fatima Zaidi",        spec:"Bail, Constitutional",        area:"Cunningham Rd, Bengaluru", rating:4.9, cases:156, success:88, exp:11, langs:"English, Hindi, Urdu",     fee:"Rs.3,500-Rs.8,000",  phone:"+91 94481 00077", proBono:true  },
     { name:"Adv. Sanjay Banerjee",     spec:"Bail Matters, Criminal",      area:"Karol Bagh, Bengaluru",    rating:4.6, cases:389, success:76, exp:17, langs:"English, Bengali, Hindi",  fee:"Rs.1,800-Rs.4,500",  phone:"+91 93000 00062", proBono:true  },
   ];
   const summaryMatch = aiText?.match(/summary[:\s]+([^#\n]{40,300})/i);
