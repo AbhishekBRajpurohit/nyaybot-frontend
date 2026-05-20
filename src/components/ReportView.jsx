@@ -1,62 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import jsPDF from "jspdf";
 import {
   ArrowLeft, Scale, FileText, ShieldCheck, Clock, Calendar,
   User, Phone, Star, CheckCircle, XCircle, Info, TrendingUp,
-  BookOpen, MapPin, Gavel, AlertTriangle, Download, Printer, Loader2
+  BookOpen, MapPin, Gavel, AlertTriangle, Download, Printer
 } from "lucide-react";
 
-// ─── Groq Timeline Fetcher ────────────────────────────────────────────────────
-async function fetchTimelineFromGroq(caseType, sections, inputText, groqApiKey) {
-  const sectionList =
-    sections.map(s => `${s.code} (${s.name})`).join(", ") ||
-    "No specific sections identified";
-
-  const prompt = `You are an Indian criminal law expert. Based on the following case details, provide a realistic estimated timeline for case resolution in Indian courts.
-
-Case Type: ${caseType}
-Legal Sections: ${sectionList}
-Case Summary: ${inputText}
-
-Consider:
-- Indian court backlogs and typical hearing intervals
-- POCSO cases have mandatory fast-track courts but still take 3-7 years
-- Murder (IPC 302) cases in sessions court take 5-10 years
-- Rape (IPC 376) fast-track courts: 3-5 years
-- Money laundering / ED cases: 5-10+ years
-- Bailable/minor offences: 6-18 months
-- Family/divorce matters: 1-3 years
-- Cyber crimes: 2-4 years
-
-Respond with ONLY a short timeline string. Examples:
-"3–7 years (trial + appeals)"
-"6–18 months"
-"5–10 years (sessions court + appeals)"
-"1–3 years"
-"Lifetime imprisonment possible; trial 5–10 years"
-
-Respond with ONLY the timeline string, nothing else. No explanation.`;
-
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${groqApiKey}`,
-    },
-    body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 60,
-      temperature: 0.1,
-    }),
-  });
-
-  if (!response.ok) throw new Error("Groq API error");
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content?.trim() || "2–5 years";
-}
-
-// ─── Markdown renderer ────────────────────────────────────────────────────────
+// ─── Markdown renderer ───────────────────────────────────────────────────────
 function renderInline(text) {
   if (!text) return text;
   const parts = [];
@@ -65,12 +15,9 @@ function renderInline(text) {
   while ((match = regex.exec(text)) !== null) {
     if (match.index > last) parts.push(text.slice(last, match.index));
     const raw = match[0];
-    if (raw.startsWith("**"))
-      parts.push(<strong key={key++} className="text-white font-bold">{raw.slice(2, -2)}</strong>);
-    else if (raw.startsWith("*"))
-      parts.push(<em key={key++} className="text-slate-200 italic">{raw.slice(1, -1)}</em>);
-    else if (raw.startsWith("`"))
-      parts.push(<code key={key++} className="bg-white/10 text-yellow-300 text-xs px-1.5 py-0.5 rounded font-mono">{raw.slice(1, -1)}</code>);
+    if (raw.startsWith("**")) parts.push(<strong key={key++} className="text-white font-bold">{raw.slice(2,-2)}</strong>);
+    else if (raw.startsWith("*")) parts.push(<em key={key++} className="text-slate-200 italic">{raw.slice(1,-1)}</em>);
+    else if (raw.startsWith("`")) parts.push(<code key={key++} className="bg-white/10 text-yellow-300 text-xs px-1.5 py-0.5 rounded font-mono">{raw.slice(1,-1)}</code>);
     last = match.index + raw.length;
   }
   if (last < text.length) parts.push(text.slice(last));
@@ -82,39 +29,34 @@ function RenderMarkdown({ text }) {
   const elements = [];
   text.split("\n").forEach((line, i) => {
     if (!line.trim()) return;
-    if (line.startsWith("# "))
-      elements.push(<h2 key={i} className="text-yellow-400 font-bold text-base mt-5 mb-2">{line.replace(/^# /, "")}</h2>);
-    else if (line.startsWith("## "))
-      elements.push(<h3 key={i} className="text-yellow-300 font-bold text-sm mt-4 mb-1.5">{line.replace(/^## /, "")}</h3>);
-    else if (line.startsWith("### "))
-      elements.push(<h4 key={i} className="text-white font-semibold text-sm mt-3 mb-1">{line.replace(/^### /, "")}</h4>);
-    else if (line.match(/^[\-\*•]\s/))
-      elements.push(
-        <div key={i} className="flex items-start gap-2 my-1">
-          <span className="text-yellow-500 mt-1 shrink-0 text-xs">•</span>
-          <span className="text-slate-300 text-sm leading-relaxed">{renderInline(line.replace(/^[\-\*•]\s/, ""))}</span>
-        </div>
-      );
+    if (line.startsWith("# "))   elements.push(<h2 key={i} className="text-yellow-400 font-bold text-base mt-5 mb-2">{line.replace(/^# /,"")}</h2>);
+    else if (line.startsWith("## ")) elements.push(<h3 key={i} className="text-yellow-300 font-bold text-sm mt-4 mb-1.5">{line.replace(/^## /,"")}</h3>);
+    else if (line.startsWith("### ")) elements.push(<h4 key={i} className="text-white font-semibold text-sm mt-3 mb-1">{line.replace(/^### /,"")}</h4>);
+    else if (line.match(/^[\-\*•]\s/)) elements.push(
+      <div key={i} className="flex items-start gap-2 my-1">
+        <span className="text-yellow-500 mt-1 shrink-0 text-xs">•</span>
+        <span className="text-slate-300 text-sm leading-relaxed">{renderInline(line.replace(/^[\-\*•]\s/,""))}</span>
+      </div>
+    );
     else if (line.match(/^\d+\.\s/)) {
       const num = line.match(/^(\d+)\./)[1];
       elements.push(
         <div key={i} className="flex items-start gap-2 my-1">
           <span className="text-yellow-500 font-bold text-xs mt-1 shrink-0 w-4">{num}.</span>
-          <span className="text-slate-300 text-sm leading-relaxed">{renderInline(line.replace(/^\d+\.\s/, ""))}</span>
+          <span className="text-slate-300 text-sm leading-relaxed">{renderInline(line.replace(/^\d+\.\s/,""))}</span>
         </div>
       );
-    } else
-      elements.push(<p key={i} className="text-slate-300 text-sm leading-relaxed my-1">{renderInline(line)}</p>);
+    }
+    else elements.push(<p key={i} className="text-slate-300 text-sm leading-relaxed my-1">{renderInline(line)}</p>);
   });
   return <div>{elements}</div>;
 }
 
-// ─── Data parser ──────────────────────────────────────────────────────────────
+// ─── Data parser ─────────────────────────────────────────────────────────────
 function parseReportData(aiText, inputText) {
   const now = new Date();
-  const combined = (aiText || "") + " " + (inputText || "");
+  const combined = (aiText||"") + " " + (inputText||"");
   const sections = [];
-
   const ipcRx = /IPC\s*(\d+[A-Z]?)/gi;
   let m;
   while ((m = ipcRx.exec(combined)) !== null) {
@@ -128,31 +70,26 @@ function parseReportData(aiText, inputText) {
     if (!sections.find(s => s.code === code))
       sections.push({ code, name: `BNS Section ${m[1]}`, bailable: true });
   }
-
   let bailPct = 65;
   const bailMatch = aiText?.match(/(\d{2,3})\s*%/);
   if (bailMatch) bailPct = Math.min(95, parseInt(bailMatch[1]));
-  if (aiText?.toLowerCase().includes("bail is generally not granted") ||
-    aiText?.toLowerCase().includes("non-bailable")) bailPct = Math.min(bailPct, 25);
+  if (aiText?.toLowerCase().includes("bail is generally not granted") || aiText?.toLowerCase().includes("non-bailable")) bailPct = Math.min(bailPct, 25);
   else if (aiText?.toLowerCase().includes("bailable")) bailPct = Math.max(bailPct, 72);
-
   let caseType = "Criminal";
-  if (combined.toLowerCase().includes("pocso") || combined.toLowerCase().includes("posco")) caseType = "POCSO";
-  else if (combined.toLowerCase().includes("cyber")) caseType = "Cyber";
-  else if (combined.toLowerCase().includes("civil")) caseType = "Civil";
-  else if (combined.toLowerCase().includes("property")) caseType = "Property";
-  else if (combined.toLowerCase().includes("money laundering")) caseType = "Financial";
-  else if (combined.toLowerCase().includes("family") || combined.toLowerCase().includes("divorce")) caseType = "Family";
-  else if (combined.toLowerCase().includes("murder") || combined.toLowerCase().includes("302")) caseType = "Murder";
-
+  if (combined.toLowerCase().includes("pocso")||combined.toLowerCase().includes("posco")) caseType="POCSO";
+  else if (combined.toLowerCase().includes("cyber")) caseType="Cyber";
+  else if (combined.toLowerCase().includes("civil")) caseType="Civil";
+  else if (combined.toLowerCase().includes("property")) caseType="Property";
+  else if (combined.toLowerCase().includes("money laundering")) caseType="Financial";
+  else if (combined.toLowerCase().includes("family")||combined.toLowerCase().includes("divorce")) caseType="Family";
+  else if (combined.toLowerCase().includes("murder")||combined.toLowerCase().includes("302")) caseType="Murder";
   const hearings = [
-    { label: "FIR Date",           date: new Date(now.getTime() - 430 * 86400000), past: true  },
-    { label: "First Hearing",      date: new Date(now.getTime() - 410 * 86400000), past: true  },
-    { label: "Next Court Hearing", date: new Date(now.getTime() + 21  * 86400000), past: false },
-    { label: "Hearing 2",          date: new Date(now.getTime() + 63  * 86400000), past: false },
-    { label: "Hearing 3",          date: new Date(now.getTime() + 105 * 86400000), past: false },
+    { label:"FIR Date",           date: new Date(now.getTime()-430*86400000), past:true  },
+    { label:"FIR Date",           date: new Date(now.getTime()-410*86400000), past:true  },
+    { label:"Next Court Hearing", date: new Date(now.getTime()+21*86400000),  past:false },
+    { label:"Hearing 2",          date: new Date(now.getTime()+63*86400000),  past:false },
+    { label:"Hearing 3",          date: new Date(now.getTime()+105*86400000), past:false },
   ];
-
   const rights = [
     "Right to know the grounds of arrest (Article 22)",
     "Right to be produced before a magistrate within 24 hours",
@@ -161,62 +98,57 @@ function parseReportData(aiText, inputText) {
     "Right to inform a relative or friend about the arrest",
     "Right to medical examination by a doctor",
   ];
-
   const lawyers = [
-    { name: "Adv. Rajesh Kumar Sharma", spec: "Criminal, Bail Matters",   area: "MG Road, Bengaluru",       rating: 4.8, cases: 412, success: 78, exp: 18, langs: "English, Hindi",         fee: "Rs.3,000–Rs.8,000",  phone: "+91 98451 00021", proBono: false },
-    { name: "Adv. Priya Menon",         spec: "Criminal, Women's Rights",  area: "Civil Lines, Bengaluru",   rating: 4.9, cases: 287, success: 84, exp: 12, langs: "English, Hindi, Tamil",   fee: "Rs.2,500–Rs.6,000",  phone: "+91 99000 00014", proBono: true  },
-    { name: "Adv. Fatima Zaidi",        spec: "Bail, Constitutional",      area: "Cunningham Rd, Bengaluru", rating: 4.9, cases: 156, success: 88, exp: 11, langs: "English, Hindi, Urdu",    fee: "Rs.3,500–Rs.8,000",  phone: "+91 94481 00077", proBono: true  },
-    { name: "Adv. Sanjay Banerjee",     spec: "Bail Matters, Criminal",    area: "Karol Bagh, Bengaluru",    rating: 4.6, cases: 389, success: 76, exp: 17, langs: "English, Bengali, Hindi", fee: "Rs.1,800–Rs.4,500",  phone: "+91 93000 00062", proBono: true  },
+    { name:"Adv. Rajesh Kumar Sharma", spec:"Criminal, Bail Matters",     area:"MG Road, Bengaluru",       rating:4.8, cases:412, success:78, exp:18, langs:"English, Hindi",          fee:"Rs.3,000-Rs.8,000",  phone:"+91 98451 00021", proBono:false },
+    { name:"Adv. Priya Menon",         spec:"Criminal, Women's Rights",    area:"Civil Lines, Bengaluru",   rating:4.9, cases:287, success:84, exp:12, langs:"English, Hindi, Tamil",    fee:"Rs.2,500-Rs.6,000",  phone:"+91 99000 00014", proBono:true  },
+    { name:"Adv. Fatima Zaidi",        spec:"Bail, Constitutional",        area:"Cunningham Rd, Bengaluru", rating:4.9, cases:156, success:88, exp:11, langs:"English, Hindi, Urdu",     fee:"Rs.3,500-Rs.8,000",  phone:"+91 94481 00077", proBono:true  },
+    { name:"Adv. Sanjay Banerjee",     spec:"Bail Matters, Criminal",      area:"Karol Bagh, Bengaluru",    rating:4.6, cases:389, success:76, exp:17, langs:"English, Bengali, Hindi",  fee:"Rs.1,800-Rs.4,500",  phone:"+91 93000 00062", proBono:true  },
   ];
-
   const summaryMatch = aiText?.match(/summary[:\s]+([^#\n]{40,300})/i);
-  const summary = summaryMatch
-    ? summaryMatch[1].trim()
-    : `Case analysis complete. ${sections.length > 0 ? `Charges: ${sections.map(s => `${s.code} (${s.name})`).join(", ")}.` : ""}  Please consult a qualified lawyer.`;
-
+  const summary = summaryMatch ? summaryMatch[1].trim()
+    : `Case analysis complete. ${sections.length>0?`Charges: ${sections.map(s=>`${s.code} (${s.name})`).join(", ")}.`:""}  Please consult a qualified lawyer.`;
   return {
-    generatedAt: now, caseType,
-    inputQuery: inputText || "Case details submitted",
-    aiText: aiText || "", summary, sections, bailPct,
-    bailLabel: bailPct >= 65 ? "Likely Granted" : bailPct >= 35 ? "Uncertain — Court Discretion" : "Likely Denied",
-    bailColor: bailPct >= 65 ? "emerald" : bailPct >= 35 ? "yellow" : "red",
-    detentionLegal: !combined.toLowerCase().includes("illegal detention"),
-    rights, hearings, lawyers,
+    generatedAt:now, caseType,
+    inputQuery: inputText||"Case details submitted",
+    aiText: aiText||"", summary, sections, bailPct,
+    bailLabel: bailPct>=65?"Likely Granted":bailPct>=35?"Uncertain — Court Discretion":"Likely Denied",
+    bailColor: bailPct>=65?"emerald":bailPct>=35?"yellow":"red",
+    detentionLegal:!combined.toLowerCase().includes("illegal detention"),
+    timeline:18, rights, hearings, lawyers,
   };
 }
 
 function getSectionName(num) {
   const map = {
-    "302": "Murder", "304": "Culpable Homicide", "307": "Attempt to Murder",
-    "354": "Assault on Woman", "376": "Rape", "379": "Theft",
-    "380": "Theft in Dwelling", "392": "Robbery", "395": "Dacoity",
-    "406": "Criminal Breach of Trust", "420": "Cheating",
-    "498A": "Cruelty by Husband", "504": "Intentional Insult",
-    "506": "Criminal Intimidation", "509": "Insult to Woman",
+    "302":"Murder","304":"Culpable Homicide","307":"Attempt to Murder",
+    "354":"Assault on Woman","376":"Rape","379":"Theft",
+    "380":"Theft in Dwelling","392":"Robbery","395":"Dacoity",
+    "406":"Criminal Breach of Trust","420":"Cheating",
+    "498A":"Cruelty by Husband","504":"Intentional Insult",
+    "506":"Criminal Intimidation","509":"Insult to Woman",
   };
-  return map[num] || `IPC Section ${num}`;
+  return map[num]||`IPC Section ${num}`;
 }
-
 function isBailable(num) {
-  return !["302", "304", "307", "376", "392", "395", "396", "364", "363"].includes(num);
+  return !["302","304","307","376","392","395","396","364","363"].includes(num);
 }
 
-// ─── Lawyer Card ──────────────────────────────────────────────────────────────
+// ─── Lawyer Card ─────────────────────────────────────────────────────────────
 function LawyerCard({ lawyer }) {
-  const isFemale = ["Priya", "Fatima", "Neha", "Meena", "Deepa", "Sunita"].some(n => lawyer.name.includes(n));
-  const initials = lawyer.name.split(" ").slice(1, 3).map(n => n[0]).join("");
+  const isFemale = ["Priya","Fatima","Neha","Meena","Deepa","Sunita"].some(n=>lawyer.name.includes(n));
+  const initials = lawyer.name.split(" ").slice(1,3).map(n=>n[0]).join("");
   return (
     <div className="p-4 rounded-xl bg-[#0a0d1e] border border-white/8 hover:border-yellow-500/20 transition-all">
       <div className="flex items-start gap-3">
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm border shrink-0 ${isFemale ? "bg-pink-500/15 border-pink-500/25 text-pink-300" : "bg-yellow-500/15 border-yellow-500/25 text-yellow-300"}`}>{initials}</div>
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm border shrink-0 ${isFemale?"bg-pink-500/15 border-pink-500/25 text-pink-300":"bg-yellow-500/15 border-yellow-500/25 text-yellow-300"}`}>{initials}</div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h4 className="text-white font-bold text-sm">{lawyer.name}</h4>
-            {lawyer.proBono && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-emerald-400">PRO BONO</span>}
+            {lawyer.proBono&&<span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-emerald-400">PRO BONO</span>}
           </div>
           <p className="text-slate-500 text-xs mt-0.5">{lawyer.spec} • {lawyer.area}</p>
           <div className="flex items-center gap-3 mt-1 flex-wrap text-xs">
-            <span className="flex items-center gap-1"><Star size={10} className="text-yellow-400 fill-yellow-400" /><span className="text-yellow-300 font-bold">{lawyer.rating}</span></span>
+            <span className="flex items-center gap-1"><Star size={10} className="text-yellow-400 fill-yellow-400"/><span className="text-yellow-300 font-bold">{lawyer.rating}</span></span>
             <span className="text-slate-600">{lawyer.cases} cases</span>
             <span className="text-emerald-400 font-semibold">{lawyer.success}% success</span>
             <span className="text-slate-600">{lawyer.exp} yrs</span>
@@ -229,14 +161,11 @@ function LawyerCard({ lawyer }) {
       </div>
       <div className="flex gap-2 mt-3">
         <a href={`tel:${lawyer.phone}`} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs transition-all">
-          <Phone size={11} /> Call
+          <Phone size={11}/> Call
         </a>
-        <a href={`https://wa.me/${lawyer.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer"
+        <a href={`https://wa.me/${lawyer.phone.replace(/\D/g,"")}`} target="_blank" rel="noreferrer"
           className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#25d366] hover:bg-[#1ebe5d] text-white font-bold text-xs transition-all">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-            <path d="M12 0C5.373 0 0 5.373 0 12c0 2.114.549 4.1 1.51 5.829L.057 23.997l6.304-1.654A11.954 11.954 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.002-1.369l-.36-.214-3.733.979.996-3.638-.234-.374A9.818 9.818 0 1112 21.818z" />
-          </svg>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.114.549 4.1 1.51 5.829L.057 23.997l6.304-1.654A11.954 11.954 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.002-1.369l-.36-.214-3.733.979.996-3.638-.234-.374A9.818 9.818 0 1112 21.818z"/></svg>
           WhatsApp
         </a>
       </div>
@@ -244,288 +173,427 @@ function LawyerCard({ lawyer }) {
   );
 }
 
-// ─── PDF Generator ────────────────────────────────────────────────────────────
-function generatePDF(data, timeline, fmtFull) {
+
+// ─── PDF Generator — Professional Legal Document ─────────────────────────────
+function generatePDF(data, fmtFull) {
   try {
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const W = doc.internal.pageSize.getWidth();
-    const H = doc.internal.pageSize.getHeight();
-    const mL = 18, mR = 18;
-    const cW = W - mL - mR;
-    let y = 20;
+    const W   = doc.internal.pageSize.getWidth();
+    const H   = doc.internal.pageSize.getHeight();
+    const mL  = 18;
+    const mR  = 18;
+    const cW  = W - mL - mR;
+    let y     = 20;
 
-    const fc = (r, g, b) => doc.setFillColor(r, g, b);
-    const tc = (r, g, b) => doc.setTextColor(r, g, b);
-    const dc = (r, g, b) => doc.setDrawColor(r, g, b);
-    const fs = (s, st = "normal") => { doc.setFontSize(s); doc.setFont("helvetica", st); };
-    const nl = (n = 5) => { y += n; };
+    // ── Safe color setters (no spread) ──────────────────────────────────
+    const fc = (r,g,b)   => doc.setFillColor(r,g,b);
+    const tc = (r,g,b)   => doc.setTextColor(r,g,b);
+    const dc = (r,g,b)   => doc.setDrawColor(r,g,b);
+    const fs = (s,st="normal") => { doc.setFontSize(s); doc.setFont("helvetica",st); };
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+    const nl = (n=5) => { y += n; };
+
+    const addFooter = () => {
+      const p = doc.internal.getNumberOfPages();
+      dc(212,160,23); doc.setLineWidth(0.3);
+      doc.line(mL, H-12, W-mR, H-12);
+      fs(7); tc(140,110,30);
+      doc.text("NyayBot AI  |  Justice Made Understandable  |  nyaybot.in", mL, H-7);
+      doc.text(`Page ${p}`, W-mR, H-7, { align: "right" });
+      tc(150,150,150);
+      doc.text("This report does not constitute legal advice.", W/2, H-7, { align: "center" });
+    };
 
     const newPage = () => {
       doc.addPage();
-      fc(255, 255, 255); doc.rect(0, 0, W, H, "F");
+      fc(255,255,255); doc.rect(0,0,W,H,"F");
       y = 25;
     };
-    const chk = (n = 15) => { if (y + n > H - 18) newPage(); };
-    const hrGold = () => { dc(212, 160, 23); doc.setLineWidth(0.3); doc.line(mL, y, W - mR, y); nl(4); };
+
+    const chk = (n=15) => { if (y + n > H - 18) newPage(); };
+
+    const hrGold = () => {
+      dc(212,160,23); doc.setLineWidth(0.3);
+      doc.line(mL, y, W-mR, y); nl(4);
+    };
+
+    const hrLight = () => {
+      dc(220,220,220); doc.setLineWidth(0.2);
+      doc.line(mL, y, W-mR, y); nl(4);
+    };
+
     const sectionHead = (title) => {
       chk(18); nl(3);
-      fc(212, 160, 23); doc.rect(mL, y - 3, 3, 7, "F");
-      fs(9, "bold"); tc(30, 30, 30);
-      doc.text(title, mL + 7, y + 1);
+      fc(212,160,23); doc.rect(mL, y-3, 3, 7, "F");
+      fs(9,"bold"); tc(30,30,30);
+      doc.text(title, mL+7, y+1);
       nl(9); hrGold();
     };
-    const multiLine = (text, x, maxW, size = 8.5, r = 50, g = 50, b = 50, style = "normal") => {
-      fs(size, style); tc(r, g, b);
-      const lines = doc.splitTextToSize(String(text || ""), maxW);
+
+    const multiLine = (text, x, maxW, size=8.5, r=50,g=50,b=50, style="normal") => {
+      fs(size,style); tc(r,g,b);
+      const lines = doc.splitTextToSize(String(text||""), maxW);
       lines.forEach(line => { chk(6); doc.text(line, x, y); nl(5); });
     };
 
-    // White background
-    fc(255, 255, 255); doc.rect(0, 0, W, H, "F");
+    // ════════════════════════════════════════════════════════════════════
+    // WHITE BACKGROUND
+    // ════════════════════════════════════════════════════════════════════
+    fc(255,255,255); doc.rect(0,0,W,H,"F");
 
-    // Gold header
-    fc(212, 160, 23); doc.rect(0, 0, W, 30, "F");
-    fc(20, 20, 20); doc.circle(mL + 9, 15, 9, "F");
-    fs(8, "bold"); tc(212, 160, 23);
-    doc.text("NY", mL + 5.5, 17);
-    fs(20, "bold"); tc(255, 255, 255);
-    doc.text("NyayBot", mL + 24, 13);
-    fs(7.5, "normal"); tc(30, 20, 0);
-    doc.text("AI-POWERED LEGAL CASE REPORT", mL + 24, 21);
-    fs(7, "normal"); tc(30, 20, 0);
-    doc.text("Generated: " + fmtFull(data.generatedAt), W - mR, 11, { align: "right" });
-    fs(7, "bold"); tc(20, 20, 20);
-    doc.text("CONFIDENTIAL", W - mR, 22, { align: "right" });
+    // ── GOLD HEADER BANNER ───────────────────────────────────────────────
+    fc(212,160,23); doc.rect(0,0,W,30,"F");
+
+    // Logo circle
+    fc(20,20,20); doc.circle(mL+9, 15, 9, "F");
+    fs(8,"bold"); tc(212,160,23);
+    doc.text("NY", mL+5.5, 17);
+
+    // Title
+    fs(20,"bold"); tc(255,255,255);
+    doc.text("NyayBot", mL+24, 13);
+    fs(7.5,"normal"); tc(30,20,0);
+    doc.text("AI-POWERED LEGAL CASE REPORT", mL+24, 21);
+
+    // Right side of banner
+    fs(7,"normal"); tc(30,20,0);
+    doc.text("Generated: " + fmtFull(data.generatedAt), W-mR, 11, { align:"right" });
+    fs(7,"bold"); tc(20,20,20);
+    doc.text("CONFIDENTIAL", W-mR, 22, { align:"right" });
+
     y = 38;
 
-    // Overview box
-    fc(252, 248, 235); doc.roundedRect(mL, y, cW, 40, 2, 2, "F");
-    dc(212, 160, 23); doc.setLineWidth(0.5);
+    // ── CASE OVERVIEW BOX ───────────────────────────────────────────────
+    fc(252,248,235); doc.roundedRect(mL, y, cW, 40, 2, 2, "F");
+    dc(212,160,23); doc.setLineWidth(0.5);
     doc.roundedRect(mL, y, cW, 40, 2, 2, "S");
-    fs(8, "bold"); tc(110, 80, 10);
-    doc.text("CASE OVERVIEW", mL + 5, y + 8);
+
+    fs(8,"bold"); tc(110,80,10);
+    doc.text("CASE OVERVIEW", mL+5, y+8);
+
+    // 4 columns inside box
     const ovCols = [
-      ["Case Type", data.caseType],
+      ["Case Type",      data.caseType],
       ["Sections Found", String(data.sections.length)],
-      ["Est. Timeline", timeline],
-      ["Detention", data.detentionLegal ? "Within Limits" : "Check Required"],
+      ["Est. Timeline",  data.timeline+" months"],
+      ["Detention",      data.detentionLegal ? "Within Limits" : "Check Required"],
     ];
     const colW = cW / 4;
     ovCols.forEach(([label, val], i) => {
-      const cx = mL + i * colW + 5;
-      fs(7, "normal"); tc(130, 100, 30);
-      doc.text(label, cx, y + 19);
-      fs(i === 2 ? 7 : 10, "bold");
-      if (i === 3) { data.detentionLegal ? tc(20, 130, 60) : tc(185, 28, 28); }
-      else { tc(20, 20, 20); }
-      const valLines = doc.splitTextToSize(val, colW - 8);
-      valLines.forEach((vl, vi) => doc.text(vl, cx, y + 28 + vi * 5));
+      const cx = mL + i*colW + 5;
+      fs(7,"normal"); tc(130,100,30);
+      doc.text(label, cx, y+19);
+      fs(10,"bold");
+      if (i === 3) {
+        data.detentionLegal ? tc(20,130,60) : tc(185,28,28);
+      } else {
+        tc(20,20,20);
+      }
+      doc.text(val, cx, y+30);
     });
-    for (let i = 1; i < 4; i++) {
-      dc(212, 160, 23); doc.setLineWidth(0.2);
-      doc.line(mL + i * colW, y + 12, mL + i * colW, y + 37);
+
+    // Column dividers
+    for (let i=1; i<4; i++) {
+      dc(212,160,23); doc.setLineWidth(0.2);
+      doc.line(mL + i*colW, y+12, mL + i*colW, y+37);
     }
     y += 47;
 
-    // Query
+    // ── YOUR QUERY ───────────────────────────────────────────────────────
     if (data.inputQuery) {
-      nl(2); fs(7, "bold"); tc(120, 90, 20);
+      chk(20);
+      nl(2);
+      fs(7,"bold"); tc(120,90,20);
       doc.text("YOUR QUERY", mL, y); nl(5);
-      fc(245, 245, 245); dc(200, 190, 160); doc.setLineWidth(0.3);
-      const qLines = doc.splitTextToSize(data.inputQuery, cW - 6);
+      fc(245,245,245); dc(200,190,160); doc.setLineWidth(0.3);
+      const qLines = doc.splitTextToSize(data.inputQuery, cW-6);
       const qH = qLines.length * 5 + 10;
-      doc.roundedRect(mL, y - 3, cW, qH, 2, 2, "FD");
-      fs(9, "normal"); tc(30, 30, 30);
-      qLines.forEach(l => { doc.text(l, mL + 4, y + 1); nl(5); });
+      doc.roundedRect(mL, y-3, cW, qH, 2, 2, "FD");
+      fs(9,"normal"); tc(30,30,30);
+      qLines.forEach(l => { doc.text(l, mL+4, y+1); nl(5); });
       y += 5;
     }
 
+    // ── PLAIN LANGUAGE SUMMARY ───────────────────────────────────────────
     sectionHead("PLAIN-LANGUAGE SUMMARY");
-    multiLine(data.summary, mL, cW, 9, 40, 40, 40);
+    multiLine(data.summary, mL, cW, 9, 40,40,40);
     nl(2);
 
-    // Bail probability
+    // ── BAIL PROBABILITY ─────────────────────────────────────────────────
     sectionHead("BAIL PROBABILITY ASSESSMENT");
     chk(38);
-    let bailR = 22, bailG = 163, bailB = 74, bgR = 235, bgG = 250, bgB = 242;
-    if (data.bailColor === "yellow") { bailR = 161; bailG = 120; bailB = 0; bgR = 253; bgG = 248; bgB = 225; }
-    if (data.bailColor === "red")    { bailR = 185; bailG = 28;  bailB = 28; bgR = 253; bgG = 235; bgB = 235; }
-    fc(bgR, bgG, bgB); dc(bailR, bailG, bailB); doc.setLineWidth(0.5);
+
+    // Color based on bail
+    let bailR=22,bailG=163,bailB=74; // green
+    let bgR=235,bgG=250,bgB=242;
+    if (data.bailColor==="yellow") { bailR=161;bailG=120;bailB=0; bgR=253;bgG=248;bgB=225; }
+    if (data.bailColor==="red")    { bailR=185;bailG=28; bailB=28;bgR=253;bgG=235;bgB=235; }
+
+    fc(bgR,bgG,bgB); dc(bailR,bailG,bailB); doc.setLineWidth(0.5);
     doc.roundedRect(mL, y, cW, 35, 2, 2, "FD");
-    fs(32, "bold"); tc(bailR, bailG, bailB);
-    doc.text(data.bailPct + "%", mL + 8, y + 24);
-    fs(11, "bold"); tc(bailR, bailG, bailB);
-    doc.text(data.bailLabel, mL + 42, y + 13);
-    fc(210, 210, 210); doc.roundedRect(mL + 42, y + 16, cW - 52, 5, 1, 1, "F");
-    fc(bailR, bailG, bailB); doc.roundedRect(mL + 42, y + 16, (cW - 52) * (data.bailPct / 100), 5, 1, 1, "F");
-    fs(7.5, "normal"); tc(bailR, bailG, bailB);
-    doc.text("AI-based assessment. Consult a qualified lawyer for accurate evaluation.", mL + 42, y + 27);
+
+    // Big %
+    fs(32,"bold"); tc(bailR,bailG,bailB);
+    doc.text(data.bailPct+"%", mL+8, y+24);
+
+    // Label
+    fs(11,"bold"); tc(bailR,bailG,bailB);
+    doc.text(data.bailLabel, mL+42, y+13);
+
+    // Progress bar background
+    fc(210,210,210);
+    doc.roundedRect(mL+42, y+16, cW-52, 5, 1,1, "F");
+    // Progress bar fill
+    fc(bailR,bailG,bailB);
+    doc.roundedRect(mL+42, y+16, (cW-52)*(data.bailPct/100), 5, 1,1, "F");
+
+    // Reasoning
+    fs(7.5,"normal"); tc(bailR,bailG,bailB);
+    doc.text("AI-based assessment. Consult a qualified lawyer for accurate evaluation.", mL+42, y+27);
+
     y += 42;
-    if (data.sections.some(s => s.bailable))  { chk(6); fs(8, "normal"); tc(22, 120, 60);  doc.text("[+]  All identified offences are bailable under IPC.", mL + 2, y); nl(6); }
-    if (data.sections.some(s => !s.bailable)) { chk(6); fs(8, "normal"); tc(185, 28, 28);  doc.text("[-]  Non-bailable offences found - court discretion required.", mL + 2, y); nl(6); }
+
+    if (data.sections.some(s=>s.bailable)) {
+      chk(6); fs(8,"normal"); tc(22,120,60);
+      doc.text("[+]  All identified offences are bailable under IPC.", mL+2, y); nl(6);
+    }
+    if (data.sections.some(s=>!s.bailable)) {
+      chk(6); fs(8,"normal"); tc(185,28,28);
+      doc.text("[-]  Non-bailable offences found - court discretion required.", mL+2, y); nl(6);
+    }
     nl(2);
 
-    // Legal sections
+    // ── LEGAL SECTIONS ───────────────────────────────────────────────────
     if (data.sections.length > 0) {
       sectionHead("IDENTIFIED LEGAL SECTIONS");
-      fc(212, 160, 23); doc.rect(mL, y, cW, 8, "F");
-      fs(7.5, "bold"); tc(255, 255, 255);
-      doc.text("Section", mL + 4, y + 5.5);
-      doc.text("Description", mL + 38, y + 5.5);
-      doc.text("Status", W - mR - 22, y + 5.5);
+
+      // Table header
+      fc(212,160,23); doc.rect(mL, y, cW, 8, "F");
+      fs(7.5,"bold"); tc(255,255,255);
+      doc.text("Section",    mL+4,    y+5.5);
+      doc.text("Description",mL+38,   y+5.5);
+      doc.text("Status",     W-mR-22, y+5.5);
       nl(8);
+
       data.sections.forEach((sec, i) => {
         chk(10);
-        if (i % 2 === 0) { fc(249, 246, 235); dc(235, 225, 200); doc.setLineWidth(0.1); doc.rect(mL, y - 3, cW, 9, "FD"); }
-        fs(8, "bold"); tc(120, 90, 20); doc.text(sec.code, mL + 4, y + 2);
-        fs(8, "normal"); tc(40, 40, 40); doc.text(sec.name, mL + 38, y + 2);
-        fs(7.5, "bold");
-        sec.bailable ? tc(22, 120, 60) : tc(185, 28, 28);
-        doc.text(sec.bailable ? "Bailable" : "Non-Bailable", W - mR - 22, y + 2);
+        if (i%2===0) { fc(249,246,235); dc(235,225,200); doc.setLineWidth(0.1); doc.rect(mL, y-3, cW, 9, "FD"); }
+        fs(8,"bold");   tc(120,90,20);    doc.text(sec.code, mL+4, y+2);
+        fs(8,"normal"); tc(40,40,40);     doc.text(sec.name, mL+38, y+2);
+        fs(7.5,"bold");
+        sec.bailable ? tc(22,120,60) : tc(185,28,28);
+        doc.text(sec.bailable?"Bailable":"Non-Bailable", W-mR-22, y+2);
         nl(9);
       });
       nl(3);
     }
 
-    // Detention + Timeline
+    // ── DETENTION + TIMELINE ─────────────────────────────────────────────
     sectionHead("ILLEGAL DETENTION CHECK & TIMELINE");
     chk(22);
-    if (data.detentionLegal) { fc(235, 250, 242); dc(22, 120, 60); }
-    else { fc(253, 235, 235); dc(185, 28, 28); }
+
+    // Left box - detention
+    if (data.detentionLegal) { fc(235,250,242); dc(22,120,60); }
+    else                     { fc(253,235,235); dc(185,28,28); }
     doc.setLineWidth(0.4);
-    doc.roundedRect(mL, y, cW / 2 - 3, 18, 2, 2, "FD");
-    fs(7.5, "bold"); data.detentionLegal ? tc(22, 120, 60) : tc(185, 28, 28);
-    doc.text("Detention Status", mL + 4, y + 7);
-    fs(8, "normal"); tc(30, 30, 30);
-    doc.text(data.detentionLegal ? "Within Legal Limits" : "Potentially Illegal", mL + 4, y + 14);
-    fc(245, 245, 245); dc(200, 190, 160); doc.setLineWidth(0.3);
-    doc.roundedRect(mL + cW / 2 + 3, y, cW / 2 - 3, 18, 2, 2, "FD");
-    fs(7.5, "bold"); tc(100, 80, 20);
-    doc.text("Estimated Timeline", mL + cW / 2 + 7, y + 7);
-    fs(7, "normal"); tc(30, 30, 30);
-    const tlLines = doc.splitTextToSize(timeline, cW / 2 - 12);
-    tlLines.forEach((tl, ti) => doc.text(tl, mL + cW / 2 + 7, y + 13 + ti * 4));
+    doc.roundedRect(mL, y, cW/2-3, 18, 2,2, "FD");
+    fs(7.5,"bold"); data.detentionLegal ? tc(22,120,60) : tc(185,28,28);
+    doc.text("Detention Status", mL+4, y+7);
+    fs(8,"normal"); tc(30,30,30);
+    doc.text(data.detentionLegal?"Within Legal Limits":"Potentially Illegal", mL+4, y+14);
+
+    // Right box - timeline
+    fc(245,245,245); dc(200,190,160); doc.setLineWidth(0.3);
+    doc.roundedRect(mL+cW/2+3, y, cW/2-3, 18, 2,2, "FD");
+    fs(7.5,"bold"); tc(100,80,20);
+    doc.text("Estimated Timeline", mL+cW/2+7, y+7);
+    fs(8,"normal"); tc(30,30,30);
+    doc.text("~"+data.timeline+" months to resolution", mL+cW/2+7, y+14);
+
     y += 25;
 
-    // Hearings
+    // ── UPCOMING HEARINGS ────────────────────────────────────────────────
     sectionHead("UPCOMING HEARINGS");
     data.hearings.forEach((h, i) => {
       chk(11);
-      const ds = h.date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+      const ds     = h.date.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
       const isPast = h.date < new Date();
-      const isNext = !isPast && i === data.hearings.findIndex(x => !x.past);
-      if (isNext) { fc(255, 248, 220); dc(212, 160, 23); doc.setLineWidth(0.3); doc.roundedRect(mL, y - 3, cW, 10, 1, 1, "FD"); }
-      if (isPast) fc(180, 180, 180); else if (isNext) fc(212, 160, 23); else fc(50, 130, 200);
-      doc.circle(mL + 4, y + 1.5, 2, "F");
-      fs(8.5, isNext ? "bold" : "normal"); isPast ? tc(150, 150, 150) : tc(30, 30, 30);
-      doc.text(h.label, mL + 10, y + 2.5);
-      fs(8.5, "bold"); isPast ? tc(150, 150, 150) : tc(80, 60, 10);
-      doc.text(ds, W - mR - 35, y + 2.5);
-      if (isNext) { fs(6.5, "bold"); tc(150, 110, 0); doc.text("NEXT", W - mR - 4, y + 2.5, { align: "right" }); }
+      const isNext = !isPast && i===data.hearings.findIndex(x=>!x.past);
+
+      // Highlight next hearing
+      if (isNext) {
+        fc(255,248,220); dc(212,160,23); doc.setLineWidth(0.3);
+        doc.roundedRect(mL, y-3, cW, 10, 1,1, "FD");
+      }
+
+      // Dot
+      if (isPast)      { fc(180,180,180); }
+      else if (isNext) { fc(212,160,23);  }
+      else             { fc(50,130,200);  }
+      doc.circle(mL+4, y+1.5, 2, "F");
+
+      fs(8.5, isNext?"bold":"normal");
+      isPast ? tc(150,150,150) : tc(30,30,30);
+      doc.text(h.label, mL+10, y+2.5);
+
+      fs(8.5,"bold");
+      isPast ? tc(150,150,150) : tc(80,60,10);
+      doc.text(ds, W-mR-35, y+2.5);
+
+      if (isNext) {
+        fs(6.5,"bold"); tc(150,110,0);
+        doc.text("NEXT", W-mR-4, y+2.5, {align:"right"});
+      }
       nl(10);
     });
     nl(2);
 
-    // Rights
+    // ── YOUR LEGAL RIGHTS ────────────────────────────────────────────────
     sectionHead("YOUR LEGAL RIGHTS");
     data.rights.forEach((right, i) => {
       chk(10);
-      fc(212, 160, 23); doc.circle(mL + 4, y + 0.5, 3, "F");
-      fs(6.5, "bold"); tc(255, 255, 255);
-      doc.text(String(i + 1), mL + 4, y + 1.8, { align: "center" });
-      const rLines = doc.splitTextToSize(right, cW - 12);
-      fs(8.5, "normal"); tc(35, 35, 35);
-      rLines.forEach((line, li) => { chk(6); doc.text(line, mL + 11, y + (li === 0 ? 1.5 : 0)); if (li < rLines.length - 1) nl(5); });
+      // Number badge
+      fc(212,160,23); doc.circle(mL+4, y+0.5, 3, "F");
+      fs(6.5,"bold"); tc(255,255,255);
+      doc.text(String(i+1), mL+4, y+1.8, {align:"center"});
+
+      // Right text
+      const rLines = doc.splitTextToSize(right, cW-12);
+      fs(8.5,"normal"); tc(35,35,35);
+      rLines.forEach((line, li) => {
+        chk(6);
+        doc.text(line, mL+11, y+(li===0?1.5:0));
+        if (li < rLines.length-1) nl(5);
+      });
       nl(9);
     });
     nl(2);
 
-    // AI Analysis
+    // ── AI ANALYSIS ──────────────────────────────────────────────────────
     sectionHead("FULL AI LEGAL ANALYSIS");
+
     const cleanAI = (data.aiText || "No AI analysis available.")
-      .replace(/\*\*/g, "").replace(/\*/g, "").replace(/#{1,4}\s?/g, "")
-      .replace(/`/g, "").replace(/[^\x00-\x7F]/g, " ").replace(/\s+/g, " ").trim();
-    cleanAI.split(/\n+/).filter(p => p.trim().length > 3).forEach(para => {
+      .replace(/\*\*/g,"").replace(/\*/g,"")
+      .replace(/#{1,4}\s?/g,"")
+      .replace(/`/g,"")
+      .replace(/[^\x00-\x7F]/g," ")  // strip all emojis & non-ASCII
+      .replace(/\s+/g," ")
+      .trim();
+
+    const aiParas = cleanAI.split(/\n+/).filter(p => p.trim().length > 3);
+    aiParas.forEach(para => {
       chk(12);
       const isHead = para.length < 70 && !para.trim().endsWith(".");
-      if (isHead) { nl(2); fs(9, "bold"); tc(70, 50, 10); doc.splitTextToSize(para, cW).forEach(l => { chk(6); doc.text(l, mL, y); nl(5); }); }
-      else { fs(8.5, "normal"); tc(45, 45, 45); doc.splitTextToSize(para, cW).forEach(l => { chk(5); doc.text(l, mL, y); nl(5); }); }
+      if (isHead) {
+        nl(2); fs(9,"bold"); tc(70,50,10);
+        const hl = doc.splitTextToSize(para, cW);
+        hl.forEach(l => { chk(6); doc.text(l, mL, y); nl(5); });
+      } else {
+        fs(8.5,"normal"); tc(45,45,45);
+        const pl = doc.splitTextToSize(para, cW);
+        pl.forEach(l => { chk(5); doc.text(l, mL, y); nl(5); });
+      }
       nl(1);
     });
     nl(3);
 
-    // Lawyers
+    // ── RECOMMENDED LAWYERS ──────────────────────────────────────────────
     sectionHead("RECOMMENDED LAWYERS NEAR YOU");
+
     data.lawyers.forEach((lw, i) => {
       chk(40);
       const boxH = 38;
-      i % 2 === 0 ? fc(252, 249, 240) : fc(248, 252, 248);
-      dc(200, 190, 160); doc.setLineWidth(0.3);
-      doc.roundedRect(mL, y, cW, boxH, 2, 2, "FD");
-      fc(212, 160, 23); doc.rect(mL, y, 3.5, boxH, "F");
-      fc(20, 20, 20); doc.circle(mL + 13, y + 9, 6, "F");
-      fs(8, "bold"); tc(212, 160, 23);
-      doc.text(String(i + 1), mL + 13, y + 11.5, { align: "center" });
-      fs(10, "bold"); tc(15, 15, 15);
-      doc.text(lw.name, mL + 24, y + 10);
-      if (lw.proBono) { fc(22, 120, 60); doc.roundedRect(W - mR - 24, y + 4, 22, 7, 1, 1, "F"); fs(6, "bold"); tc(255, 255, 255); doc.text("PRO BONO", W - mR - 20.5, y + 9, { align: "center" }); }
-      fs(8, "normal"); tc(80, 65, 30);
-      doc.text(lw.spec + "  |  " + lw.area, mL + 24, y + 17);
-      fs(7.5, "normal"); tc(55, 55, 55);
-      doc.text("Rating: " + lw.rating + "   |   " + lw.cases + " cases   |   " + lw.success + "% success   |   " + lw.exp + " yrs exp", mL + 24, y + 24);
-      doc.text("Languages: " + lw.langs, mL + 24, y + 30);
-      fs(7.5, "bold"); tc(110, 80, 10);
-      doc.text(lw.fee + "/hearing", W - mR - 45, y + 24);
-      fs(7.5, "normal"); tc(55, 55, 55);
-      doc.text("Ph: " + lw.phone, W - mR - 45, y + 30);
+
+      // Card background alternating
+      i%2===0 ? fc(252,249,240) : fc(248,252,248);
+      dc(200,190,160); doc.setLineWidth(0.3);
+      doc.roundedRect(mL, y, cW, boxH, 2,2, "FD");
+
+      // Gold left strip
+      fc(212,160,23); doc.rect(mL, y, 3.5, boxH, "F");
+
+      // Number badge
+      fc(20,20,20); doc.circle(mL+13, y+9, 6, "F");
+      fs(8,"bold"); tc(212,160,23);
+      doc.text(String(i+1), mL+13, y+11.5, {align:"center"});
+
+      // Name
+      fs(10,"bold"); tc(15,15,15);
+      doc.text(lw.name, mL+24, y+10);
+
+      // Pro Bono badge
+      if (lw.proBono) {
+        fc(22,120,60); doc.roundedRect(W-mR-24, y+4, 22, 7, 1,1, "F");
+        fs(6,"bold"); tc(255,255,255);
+        doc.text("PRO BONO", W-mR-20.5, y+9, {align:"center"});
+      }
+
+      // Specialisation
+      fs(8,"normal"); tc(80,65,30);
+      doc.text(lw.spec+"  |  "+lw.area, mL+24, y+17);
+
+      // Stats row
+      fs(7.5,"normal"); tc(55,55,55);
+      doc.text(
+        "Rating: "+lw.rating+"   |   "+lw.cases+" cases   |   "+lw.success+"% success   |   "+lw.exp+" yrs exp",
+        mL+24, y+24
+      );
+
+      // Contact
+      fs(7.5,"normal"); tc(55,55,55);
+      doc.text("Languages: "+lw.langs, mL+24, y+30);
+      fs(7.5,"bold"); tc(110,80,10);
+      const cleanFee = lw.fee.replace(/[^\x00-\x7F]/g,"Rs.").replace(/Rs\.Rs\./g,"Rs.");
+      doc.text(cleanFee+"/hearing", W-mR-45, y+24);
+      fs(7.5,"normal"); tc(55,55,55);
+      doc.text("Ph: "+lw.phone, W-mR-45, y+30);
+
       y += boxH + 5;
     });
+
     nl(5);
 
-    // Disclaimer
+    // ── DISCLAIMER ───────────────────────────────────────────────────────
     chk(24);
-    fc(255, 245, 225); dc(200, 130, 30); doc.setLineWidth(0.4);
-    doc.roundedRect(mL, y, cW, 22, 2, 2, "FD");
-    fs(8, "bold"); tc(150, 80, 0);
-    doc.text("IMPORTANT DISCLAIMER", mL + 5, y + 8);
-    fs(7.5, "normal"); tc(100, 60, 0);
-    doc.splitTextToSize(
-      "This report is generated by NyayBot AI for informational purposes only and does not constitute legal advice. " +
-      "Always consult a qualified and licensed advocate for your specific legal situation. " +
+    fc(255,245,225); dc(200,130,30); doc.setLineWidth(0.4);
+    doc.roundedRect(mL, y, cW, 22, 2,2, "FD");
+    fs(8,"bold"); tc(150,80,0);
+    doc.text("IMPORTANT DISCLAIMER", mL+5, y+8);
+    fs(7.5,"normal"); tc(100,60,0);
+    const disc = doc.splitTextToSize(
+      "This report is generated by NyayBot AI for informational purposes only and does not constitute legal advice. "+
+      "Always consult a qualified and licensed advocate for your specific legal situation. "+
       "Bail probability estimates are indicative and may vary based on court discretion.",
-      cW - 10
-    ).forEach((l, i) => doc.text(l, mL + 5, y + 14 + i * 4));
+      cW-10
+    );
+    disc.forEach((l,i) => doc.text(l, mL+5, y+14+(i*4)));
     y += 27;
 
-    // Footer on all pages
+    // ── ADD FOOTER TO ALL PAGES ──────────────────────────────────────────
     const total = doc.internal.getNumberOfPages();
-    for (let p = 1; p <= total; p++) {
+    for (let p=1; p<=total; p++) {
       doc.setPage(p);
-      dc(212, 160, 23); doc.setLineWidth(0.4);
-      doc.line(mL, H - 13, W - mR, H - 13);
-      fs(7, "normal"); tc(130, 100, 30);
-      doc.text("NyayBot AI  |  Justice Made Understandable  |  nyaybot.in", mL, H - 7);
-      tc(150, 150, 150);
-      doc.text("Report does not constitute legal advice.", W / 2, H - 7, { align: "center" });
-      tc(130, 100, 30);
-      doc.text("Page " + p + " of " + total, W - mR, H - 7, { align: "right" });
+      dc(212,160,23); doc.setLineWidth(0.4);
+      doc.line(mL, H-13, W-mR, H-13);
+      fs(7,"normal"); tc(130,100,30);
+      doc.text("NyayBot AI  |  Justice Made Understandable  |  nyaybot.in", mL, H-7);
+      tc(150,150,150);
+      doc.text("Report does not constitute legal advice.", W/2, H-7, {align:"center"});
+      tc(130,100,30);
+      doc.text("Page "+p+" of "+total, W-mR, H-7, {align:"right"});
     }
 
-    doc.save("NyayBot-Legal-Report-" + new Date().toISOString().slice(0, 10) + ".pdf");
+    doc.save("NyayBot-Legal-Report-"+new Date().toISOString().slice(0,10)+".pdf");
     return true;
-  } catch (err) {
+  } catch(err) {
     console.error("PDF error:", err);
     throw err;
   }
 }
 
-// ─── Main ReportView ──────────────────────────────────────────────────────────
-// Props:
-//   report      — the report object from your analyze flow
-//   groqApiKey  — pass from App.jsx, e.g. import.meta.env.VITE_GROQ_API_KEY
-//   lang        — optional, defaults to "en"
-//   onBack      — callback to go back
-export default function ReportView({ report, groqApiKey, lang = "en", onBack }) {
+// ─── Main ReportView ─────────────────────────────────────────────────────────
+export default function ReportView({ report, lang="en", onBack }) {
   let resolvedReport = report;
   if (!resolvedReport) {
     try {
@@ -533,41 +601,17 @@ export default function ReportView({ report, groqApiKey, lang = "en", onBack }) 
       if (saved) resolvedReport = JSON.parse(saved);
     } catch (_) {}
   }
-
-  const data = resolvedReport
-    ? parseReportData(resolvedReport.aiResponse, resolvedReport.inputText)
-    : null;
-
-  const fmt     = d => d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-  const fmtFull = d => d.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
-
-  const [pdfLoading, setPdfLoading]   = useState(false);
-  const [timeline, setTimeline]       = useState("Estimating…");
-  const [timelineLoading, setTimelineLoading] = useState(true);
-
-  // Fetch accurate timeline from Groq on mount
-  useEffect(() => {
-    if (!data || !groqApiKey) {
-      // Fallback if no key provided
-      setTimeline(getFallbackTimeline(data?.caseType, data?.sections || []));
-      setTimelineLoading(false);
-      return;
-    }
-    setTimelineLoading(true);
-    fetchTimelineFromGroq(data.caseType, data.sections, data.inputQuery, groqApiKey)
-      .then(t => { setTimeline(t); setTimelineLoading(false); })
-      .catch(() => {
-        setTimeline(getFallbackTimeline(data.caseType, data.sections));
-        setTimelineLoading(false);
-      });
-  }, []);
+  const data = resolvedReport ? parseReportData(resolvedReport.aiResponse, resolvedReport.inputText) : null;
+  const fmt     = d => d.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
+  const fmtFull = d => d.toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"});
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const handleDownload = () => {
     if (!data) return;
     setPdfLoading(true);
     try {
-      generatePDF(data, timeline, fmtFull);
-    } catch (err) {
+      generatePDF(data, fmtFull);
+    } catch(err) {
       alert("PDF generation failed: " + err.message);
     } finally {
       setPdfLoading(false);
@@ -577,22 +621,22 @@ export default function ReportView({ report, groqApiKey, lang = "en", onBack }) 
   if (!data) return (
     <div className="min-h-screen bg-[#08091a] flex flex-col items-center justify-center text-center px-6 pt-20">
       <div className="w-20 h-20 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center mb-6">
-        <FileText size={36} className="text-yellow-400" />
+        <FileText size={36} className="text-yellow-400"/>
       </div>
       <h2 className="text-white font-serif text-3xl font-bold mb-3">No Report Yet</h2>
       <p className="text-slate-400 text-base max-w-sm mb-8 leading-relaxed">
         Go to <strong className="text-white">Analyze</strong> tab, describe your case and click <strong className="text-white">Analyze</strong>.
       </p>
       <button onClick={onBack} className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-yellow-500 text-slate-900 font-bold hover:bg-yellow-400 transition-all">
-        <ArrowLeft size={16} /> Go Analyze a Case
+        <ArrowLeft size={16}/> Go Analyze a Case
       </button>
     </div>
   );
 
   const bc = {
-    emerald: { bar: "bg-emerald-500", text: "text-emerald-400", border: "border-emerald-500/25", bg: "bg-emerald-500/8" },
-    yellow:  { bar: "bg-yellow-500",  text: "text-yellow-400",  border: "border-yellow-500/25",  bg: "bg-yellow-500/8"  },
-    red:     { bar: "bg-red-500",     text: "text-red-400",     border: "border-red-500/25",     bg: "bg-red-500/8"     },
+    emerald:{ bar:"bg-emerald-500", text:"text-emerald-400", border:"border-emerald-500/25", bg:"bg-emerald-500/8" },
+    yellow: { bar:"bg-yellow-500",  text:"text-yellow-400",  border:"border-yellow-500/25",  bg:"bg-yellow-500/8"  },
+    red:    { bar:"bg-red-500",     text:"text-red-400",     border:"border-red-500/25",     bg:"bg-red-500/8"     },
   }[data.bailColor];
 
   return (
@@ -601,18 +645,18 @@ export default function ReportView({ report, groqApiKey, lang = "en", onBack }) 
       <div className="max-w-4xl mx-auto px-4 mb-6">
         <div className="flex items-center gap-3 flex-wrap">
           <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-yellow-400 transition-colors text-sm font-semibold px-3 py-2 rounded-xl hover:bg-yellow-500/8 border border-transparent hover:border-yellow-500/20">
-            <ArrowLeft size={15} /> Back
+            <ArrowLeft size={15}/> Back
           </button>
-          <div className="w-px h-5 bg-white/10" />
-          <Scale size={16} className="text-yellow-400" />
+          <div className="w-px h-5 bg-white/10"/>
+          <Scale size={16} className="text-yellow-400"/>
           <h1 className="text-white font-serif font-bold text-lg">AI-Powered Legal Case Report</h1>
           <div className="ml-auto flex gap-2">
-            <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white text-xs font-medium transition-all">
-              <Printer size={13} /> Print
+            <button onClick={()=>window.print()} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white text-xs font-medium transition-all">
+              <Printer size={13}/> Print
             </button>
-            <button onClick={handleDownload} disabled={pdfLoading || timelineLoading}
+            <button onClick={handleDownload} disabled={pdfLoading}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-yellow-500 text-slate-900 font-bold text-xs hover:bg-yellow-400 transition-all disabled:opacity-60">
-              <Download size={13} /> {pdfLoading ? "Generating..." : timelineLoading ? "Loading..." : "Download PDF"}
+              <Download size={13}/> {pdfLoading?"Generating...":"Download PDF"}
             </button>
           </div>
         </div>
@@ -623,7 +667,7 @@ export default function ReportView({ report, groqApiKey, lang = "en", onBack }) 
         <div className="rounded-2xl border border-yellow-500/20 bg-[#0c0f22] p-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-5">
             <div className="w-14 h-14 rounded-2xl bg-yellow-500 flex items-center justify-center shadow-lg shadow-yellow-500/25 shrink-0">
-              <Scale size={28} strokeWidth={2.5} className="text-slate-900" />
+              <Scale size={28} strokeWidth={2.5} className="text-slate-900"/>
             </div>
             <div>
               <h2 className="text-white font-serif font-bold text-2xl leading-none">NyayBot</h2>
@@ -634,37 +678,20 @@ export default function ReportView({ report, groqApiKey, lang = "en", onBack }) 
               <p className="text-slate-300 text-sm font-semibold">{fmtFull(data.generatedAt)}</p>
             </div>
           </div>
-
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             {[
-              { label: "Case Type",      value: data.caseType,              icon: <Gavel size={13} />,      color: "text-white" },
-              { label: "Sections Found", value: `${data.sections.length}`,  icon: <BookOpen size={13} />,   color: "text-white" },
-              {
-                label: "Est. Timeline",
-                value: timelineLoading ? null : timeline,
-                icon: timelineLoading
-                  ? <Loader2 size={13} className="animate-spin" />
-                  : <Clock size={13} />,
-                color: "text-white",
-                loading: timelineLoading,
-              },
-              {
-                label: "Detention",
-                value: data.detentionLegal ? "Within Limits" : "Check Required",
-                icon: <ShieldCheck size={13} />,
-                color: data.detentionLegal ? "text-emerald-400" : "text-red-400"
-              },
-            ].map((item, i) => (
+              {label:"Case Type",      value:data.caseType,             icon:<Gavel size={13}/>,    color:"text-white"},
+              {label:"Sections Found", value:`${data.sections.length}`, icon:<BookOpen size={13}/>, color:"text-white"},
+              {label:"Est. Timeline",  value:`${data.timeline} months`, icon:<Clock size={13}/>,    color:"text-white"},
+              {label:"Detention",      value:data.detentionLegal?"Within Limits":"Check Required", icon:<ShieldCheck size={13}/>, color:data.detentionLegal?"text-emerald-400":"text-red-400"},
+            ].map((item,i)=>(
               <div key={i} className="bg-white/4 border border-white/8 rounded-xl p-3">
                 <div className="flex items-center gap-1.5 text-slate-500 text-xs mb-1.5">{item.icon}<span>{item.label}</span></div>
-                {item.loading
-                  ? <div className="h-4 w-24 bg-white/10 rounded animate-pulse mt-1" />
-                  : <p className={`font-bold text-sm ${item.color}`}>{item.value}</p>}
+                <p className={`font-bold text-sm ${item.color}`}>{item.value}</p>
               </div>
             ))}
           </div>
-
-          {data.inputQuery && (
+          {data.inputQuery&&(
             <div className="bg-white/3 border border-white/8 rounded-xl px-4 py-3">
               <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Your Query</p>
               <p className="text-slate-300 text-sm leading-relaxed">{data.inputQuery}</p>
@@ -674,91 +701,79 @@ export default function ReportView({ report, groqApiKey, lang = "en", onBack }) 
 
         {/* Summary */}
         <div className="rounded-2xl border border-white/8 bg-[#0d1020] p-5">
-          <div className="flex items-center gap-2 mb-3"><FileText size={15} className="text-yellow-400" /><h3 className="text-white font-bold text-base">Plain-Language Summary</h3></div>
+          <div className="flex items-center gap-2 mb-3"><FileText size={15} className="text-yellow-400"/><h3 className="text-white font-bold text-base">Plain-Language Summary</h3></div>
           <p className="text-slate-300 text-sm leading-relaxed">{data.summary}</p>
         </div>
 
         {/* Bail + Sections */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className={`rounded-2xl border p-5 ${bc.border} ${bc.bg}`}>
-            <div className="flex items-center gap-2 mb-4"><TrendingUp size={15} className={bc.text} /><h3 className="text-white font-bold text-base">Bail Probability</h3></div>
+            <div className="flex items-center gap-2 mb-4"><TrendingUp size={15} className={bc.text}/><h3 className="text-white font-bold text-base">Bail Probability</h3></div>
             <div className="flex items-end gap-3 mb-3">
               <span className={`font-serif font-black text-6xl leading-none ${bc.text}`}>{data.bailPct}%</span>
               <div className="mb-1"><p className={`text-sm font-bold ${bc.text}`}>{data.bailLabel}</p><p className="text-slate-500 text-xs">based on AI analysis</p></div>
             </div>
             <div className="w-full h-2 bg-white/8 rounded-full overflow-hidden mb-4">
-              <div className={`h-full rounded-full ${bc.bar}`} style={{ width: `${data.bailPct}%` }} />
+              <div className={`h-full rounded-full ${bc.bar}`} style={{width:`${data.bailPct}%`}}/>
             </div>
             <div className="space-y-2">
-              {data.sections.some(s => s.bailable)  && <div className="flex items-center gap-2 text-xs"><CheckCircle size={12} className="text-emerald-400 shrink-0" /><span className="text-slate-400">Some bailable offences identified.</span></div>}
-              {data.sections.some(s => !s.bailable) && <div className="flex items-center gap-2 text-xs"><XCircle size={12} className="text-red-400 shrink-0" /><span className="text-slate-400">Non-bailable offences — court discretion required.</span></div>}
-              <div className="flex items-center gap-2 text-xs"><Info size={12} className="text-yellow-400 shrink-0" /><span className="text-slate-400">Consult a lawyer for accurate assessment.</span></div>
+              {data.sections.some(s=>s.bailable)&&<div className="flex items-center gap-2 text-xs"><CheckCircle size={12} className="text-emerald-400 shrink-0"/><span className="text-slate-400">Some bailable offences identified.</span></div>}
+              {data.sections.some(s=>!s.bailable)&&<div className="flex items-center gap-2 text-xs"><XCircle size={12} className="text-red-400 shrink-0"/><span className="text-slate-400">Non-bailable offences — court discretion required.</span></div>}
+              <div className="flex items-center gap-2 text-xs"><Info size={12} className="text-yellow-400 shrink-0"/><span className="text-slate-400">Consult a lawyer for accurate assessment.</span></div>
             </div>
           </div>
-
           <div className="rounded-2xl border border-white/8 bg-[#0d1020] p-5">
-            <div className="flex items-center gap-2 mb-4"><BookOpen size={15} className="text-yellow-400" /><h3 className="text-white font-bold text-base">Identified Sections</h3><span className="ml-auto text-xs text-slate-500 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">{data.sections.length}</span></div>
-            {data.sections.length > 0 ? (
+            <div className="flex items-center gap-2 mb-4"><BookOpen size={15} className="text-yellow-400"/><h3 className="text-white font-bold text-base">Identified Sections</h3><span className="ml-auto text-xs text-slate-500 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">{data.sections.length}</span></div>
+            {data.sections.length>0?(
               <div className="space-y-2">
-                {data.sections.map((sec, i) => (
+                {data.sections.map((sec,i)=>(
                   <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/4 border border-white/8">
                     <span className="text-yellow-400 font-bold text-sm shrink-0">{sec.code}</span>
                     <span className="text-slate-300 text-xs flex-1">{sec.name}</span>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shrink-0 ${sec.bailable ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400" : "bg-red-500/10 border-red-500/25 text-red-400"}`}>{sec.bailable ? "Bailable" : "Non-Bailable"}</span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shrink-0 ${sec.bailable?"bg-emerald-500/10 border-emerald-500/25 text-emerald-400":"bg-red-500/10 border-red-500/25 text-red-400"}`}>{sec.bailable?"Bailable":"Non-Bailable"}</span>
                   </div>
                 ))}
               </div>
-            ) : <p className="text-slate-500 text-sm">No specific IPC sections detected. See AI analysis below.</p>}
+            ):<p className="text-slate-500 text-sm">No specific IPC sections detected. See AI analysis below.</p>}
           </div>
         </div>
 
-        {/* Detention + Timeline */}
-        <div className={`rounded-2xl border p-4 flex items-center gap-3 ${data.detentionLegal ? "border-emerald-500/20 bg-emerald-500/5" : "border-red-500/20 bg-red-500/5"}`}>
-          <ShieldCheck size={18} className={data.detentionLegal ? "text-emerald-400 shrink-0" : "text-red-400 shrink-0"} />
-          <div>
-            <p className="text-white font-bold text-sm">Illegal Detention Check</p>
-            <p className={`text-xs mt-0.5 ${data.detentionLegal ? "text-emerald-400" : "text-red-400"}`}>
-              {data.detentionLegal ? "Detention appears within legal limits." : "Potential illegal detention — seek legal help immediately."}
-            </p>
-          </div>
-          <div className="ml-auto text-right">
-            <p className="text-slate-500 text-xs">Est. Timeline</p>
-            {timelineLoading
-              ? <div className="h-4 w-28 bg-white/10 rounded animate-pulse mt-1" />
-              : <p className="text-white font-bold text-sm">{timeline}</p>}
-          </div>
+        {/* Detention */}
+        <div className={`rounded-2xl border p-4 flex items-center gap-3 ${data.detentionLegal?"border-emerald-500/20 bg-emerald-500/5":"border-red-500/20 bg-red-500/5"}`}>
+          <ShieldCheck size={18} className={data.detentionLegal?"text-emerald-400 shrink-0":"text-red-400 shrink-0"}/>
+          <div><p className="text-white font-bold text-sm">Illegal Detention Check</p><p className={`text-xs mt-0.5 ${data.detentionLegal?"text-emerald-400":"text-red-400"}`}>{data.detentionLegal?"Detention appears within legal limits.":"Potential illegal detention — seek legal help immediately."}</p></div>
+          <div className="ml-auto text-right"><p className="text-slate-500 text-xs">Est. Timeline</p><p className="text-white font-bold text-sm">~{data.timeline} months</p></div>
         </div>
 
         {/* Hearings + Rights */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="rounded-2xl border border-white/8 bg-[#0d1020] p-5">
-            <div className="flex items-center gap-2 mb-4"><Calendar size={15} className="text-yellow-400" /><h3 className="text-white font-bold text-base">Upcoming Hearings</h3></div>
+            <div className="flex items-center gap-2 mb-4"><Calendar size={15} className="text-yellow-400"/><h3 className="text-white font-bold text-base">Upcoming Hearings</h3></div>
             <div className="relative pl-5">
-              <div className="absolute left-[7px] top-2 bottom-2 w-px bg-white/8" />
-              {data.hearings.map((h, i) => {
-                const isNext = !h.past && i === data.hearings.findIndex(x => !x.past);
-                return (
+              <div className="absolute left-[7px] top-2 bottom-2 w-px bg-white/8"/>
+              {data.hearings.map((h,i)=>{
+                const isNext=!h.past&&i===data.hearings.findIndex(x=>!x.past);
+                return(
                   <div key={i} className="relative mb-4 last:mb-0">
-                    <div className={`absolute -left-5 top-1 w-3 h-3 rounded-full border-2 ${isNext ? "bg-yellow-500 border-yellow-400" : h.past ? "bg-white/10 border-white/20" : "bg-white/5 border-white/15"}`} />
+                    <div className={`absolute -left-5 top-1 w-3 h-3 rounded-full border-2 ${isNext?"bg-yellow-500 border-yellow-400":h.past?"bg-white/10 border-white/20":"bg-white/5 border-white/15"}`}/>
                     <div className="pl-2">
                       <div className="flex items-center gap-2">
-                        <span className={`text-xs font-bold ${isNext ? "text-yellow-400" : h.past ? "text-slate-600" : "text-slate-300"}`}>{h.label}</span>
-                        {isNext && <span className="text-[9px] bg-yellow-500/15 border border-yellow-500/25 text-yellow-400 px-1.5 py-0.5 rounded-full font-bold">NEXT</span>}
+                        <span className={`text-xs font-bold ${isNext?"text-yellow-400":h.past?"text-slate-600":"text-slate-300"}`}>{h.label}</span>
+                        {isNext&&<span className="text-[9px] bg-yellow-500/15 border border-yellow-500/25 text-yellow-400 px-1.5 py-0.5 rounded-full font-bold">NEXT</span>}
                       </div>
-                      <p className={`text-sm font-semibold mt-0.5 ${h.past ? "text-slate-600" : "text-white"}`}>{fmt(h.date)}</p>
+                      <p className={`text-sm font-semibold mt-0.5 ${h.past?"text-slate-600":"text-white"}`}>{fmt(h.date)}</p>
                     </div>
                   </div>
                 );
               })}
             </div>
           </div>
-
           <div className="rounded-2xl border border-white/8 bg-[#0d1020] p-5">
-            <div className="flex items-center gap-2 mb-4"><ShieldCheck size={15} className="text-emerald-400" /><h3 className="text-white font-bold text-base">Your Legal Rights</h3></div>
+            <div className="flex items-center gap-2 mb-4"><ShieldCheck size={15} className="text-emerald-400"/><h3 className="text-white font-bold text-base">Your Legal Rights</h3></div>
             <div className="space-y-2.5">
-              {data.rights.map((right, i) => (
+              {data.rights.map((right,i)=>(
                 <div key={i} className="flex items-start gap-2.5">
-                  <CheckCircle size={13} className="text-emerald-400 shrink-0 mt-0.5" />
+                  <CheckCircle size={13} className="text-emerald-400 shrink-0 mt-0.5"/>
                   <p className="text-slate-300 text-sm leading-snug">{right}</p>
                 </div>
               ))}
@@ -769,29 +784,29 @@ export default function ReportView({ report, groqApiKey, lang = "en", onBack }) 
         {/* AI Analysis */}
         <div className="rounded-2xl border border-yellow-500/15 bg-[#0d1020] p-5">
           <div className="flex items-center gap-2 mb-4">
-            <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"/>
             <h3 className="text-white font-bold text-base">Full AI Legal Analysis</h3>
             <span className="ml-auto text-[10px] text-slate-600 bg-white/5 px-2 py-1 rounded-full">Powered by Groq</span>
           </div>
-          <RenderMarkdown text={data.aiText} />
+          <RenderMarkdown text={data.aiText}/>
         </div>
 
         {/* Lawyers */}
         <div className="rounded-2xl border border-white/8 bg-[#0d1020] p-5">
           <div className="flex items-center gap-2 mb-4">
-            <User size={15} className="text-yellow-400" />
+            <User size={15} className="text-yellow-400"/>
             <h3 className="text-white font-bold text-base">Recommended Lawyers</h3>
             <span className="ml-auto text-xs text-slate-500 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">Near You · Bengaluru</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {data.lawyers.map((lawyer, i) => <LawyerCard key={i} lawyer={lawyer} />)}
+            {data.lawyers.map((lawyer,i)=><LawyerCard key={i} lawyer={lawyer}/>)}
           </div>
         </div>
 
         {/* Disclaimer */}
         <div className="rounded-2xl border border-orange-500/20 bg-orange-500/5 p-4">
           <div className="flex items-start gap-3">
-            <AlertTriangle size={14} className="text-orange-400 shrink-0 mt-0.5" />
+            <AlertTriangle size={14} className="text-orange-400 shrink-0 mt-0.5"/>
             <p className="text-slate-400 text-xs leading-relaxed">
               <span className="text-orange-300 font-bold">Disclaimer: </span>
               This report is generated by NyayBot AI for informational purposes only and does not constitute legal advice.
@@ -803,17 +818,4 @@ export default function ReportView({ report, groqApiKey, lang = "en", onBack }) 
       </div>
     </div>
   );
-}
-
-// ─── Local fallback (used if no groqApiKey or API fails) ─────────────────────
-function getFallbackTimeline(caseType, sections = []) {
-  if (caseType === "POCSO") return "3–7 years (trial + appeals)";
-  const hasMurder = sections.some(s => ["302", "307", "304"].includes(s.code.replace(/[^0-9]/g, "")));
-  if (hasMurder || caseType === "Murder") return "5–10 years (sessions court + appeals)";
-  if (caseType === "Financial") return "4–8 years (complex trial)";
-  if (caseType === "Cyber") return "2–4 years";
-  if (caseType === "Family") return "1–3 years";
-  const allBailable = sections.length > 0 && sections.every(s => s.bailable);
-  if (allBailable) return "6–18 months";
-  return "2–5 years";
 }
