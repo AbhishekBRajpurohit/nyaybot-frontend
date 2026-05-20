@@ -11,7 +11,7 @@ const FOOTER_LINKS = {
       { label: "Press & Media", href: "#" },
       { label: "Careers", href: "#" },
       { label: "Blog", href: "#" },
-      { label: "Contact Us" },
+      { label: "Contact Us", href: "#" },
     ],
   },
   services: {

@@ -305,7 +305,7 @@ export default function ProfileView({ onBack, onViewReport }) {
               </div>
               <div className="bg-[#0d1020] border border-white/8 rounded-2xl p-4 text-center">
                 <Star size={18} className="text-yellow-400 fill-yellow-400 mx-auto mb-2"/>
-                <p className="text-white font-serif font-black text-4xl">{profile?.totalCases>0?"4.9":"—"}</p>
+                <p className="text-white font-serif font-black text-4xl">{profile?.totalCases>0?"4.5":"—"}</p>
                 <p className="text-slate-500 text-sm mt-1">AI Accuracy Rating</p>
               </div>
             </div>
