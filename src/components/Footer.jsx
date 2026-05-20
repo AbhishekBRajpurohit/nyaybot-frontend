@@ -11,7 +11,7 @@ const FOOTER_LINKS = {
       { label: "Press & Media", href: "#" },
       { label: "Careers", href: "#" },
       { label: "Blog", href: "#" },
-      { label: "Contact Us", href: "#" },
+      { label: "Contact Us" },
     ],
   },
   services: {
@@ -52,7 +52,7 @@ const FOOTER_LINKS = {
 const BADGES = [
   { icon: <Shield size={16} className="text-emerald-400" />, label: "SSL Secured" },
   { icon: <Award size={16} className="text-yellow-400" />, label: "Govt. Compliant" },
-  { icon: <Globe size={16} className="text-blue-400" />, label: "12 Languages" },
+  { icon: <Globe size={16} className="text-blue-400" />, label: "3 Languages" },
 ];
 
 const SOCIALS = [
@@ -74,7 +74,7 @@ const SOCIALS = [
   },
 ];
 
-const LANGUAGES = ["English", "हिंदी", "ಕನ್ನಡ", "தமிழ்", "తెలుగు", "मराठी"];
+const LANGUAGES = ["English", "हिंदी", "ಕನ್ನಡ"];
 
 export default function Footer({ lang = "en" }) {
   return (
