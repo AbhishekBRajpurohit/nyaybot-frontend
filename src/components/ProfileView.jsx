@@ -244,7 +244,7 @@ export default function ProfileView({ onBack, onViewReport }) {
                           <input type="text" value={newName}
                             onChange={e => setNewName(e.target.value)}
                             onKeyDown={e => e.key === "Enter" && saveName()} autoFocus
-                            className="flex-1 bg-white/8 border border-yellow-500/50 focus:border-yellow-500 rounded-xl px-4 py-2.5 text-white text-2xl font-bold font-serif focus:outline-none transition-all"/>
+                            className="flex-1 bg-white/8 border border-yellow-500/50 focus:border-yellow-500 rounded-xl px-4 py-2.5 text-black text-2xl font-bold font-serif focus:outline-none transition-all"/>
                           <button onClick={saveName} disabled={savingName}
                             className="p-2.5 rounded-xl bg-yellow-500 text-slate-900 hover:bg-yellow-400 transition-all shrink-0">
                             {savingName ? <Loader2 size={15} className="animate-spin"/> : <Check size={15}/>}
