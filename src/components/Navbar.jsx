@@ -7,6 +7,9 @@ const LANGUAGES = [
   "English",
   "Hindi (हिंदी)",
   "Kannada (ಕನ್ನಡ)",
+  "Tamil (தமிழ்)",
+  "Telugu (తెలుగు)",
+  "Marathi (मराठी)",
 ];
 
 export default function Navbar({ activeView = "home", onNavigate, lang = "en", langLabel = "English", onLangChange, onSignInClick }) {
@@ -99,54 +102,100 @@ export default function Navbar({ activeView = "home", onNavigate, lang = "en", l
 
           {user ? (
             <div className="relative">
+              {/* Trigger button */}
               <button
                 onClick={() => setUserOpen(!userOpen)}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-white/10 bg-white/5 hover:border-yellow-500/40 hover:bg-white/10 transition-all"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-white/10 bg-white/5 hover:border-yellow-500/40 hover:bg-yellow-500/8 transition-all"
               >
                 {user.avatar
-                  ? <img src={user.avatar} alt="" className="w-7 h-7 rounded-full object-cover" />
-                  : <div className="w-7 h-7 rounded-full bg-yellow-500 flex items-center justify-center text-slate-900 font-bold text-xs">{user.name?.[0]?.toUpperCase()}</div>
+                  ? <img src={user.avatar} alt="" className="w-7 h-7 rounded-full object-cover ring-1 ring-yellow-500/30"/>
+                  : <div className="w-7 h-7 rounded-full flex items-center justify-center text-slate-900 font-bold text-xs shadow-inner"
+                      style={{background:"linear-gradient(135deg,#f59e0b,#d97706)"}}>
+                      {user.name?.[0]?.toUpperCase()}
+                    </div>
                 }
-                <span className="text-white text-sm font-medium max-w-[100px] truncate">{user.name}</span>
-                <ChevronDown size={13} className={`text-slate-400 transition-transform ${userOpen ? "rotate-180" : ""}`} />
+                <span className="text-white text-sm font-medium max-w-[90px] truncate">{user.name}</span>
+                <ChevronDown size={13} className={`text-slate-400 transition-transform duration-200 ${userOpen ? "rotate-180" : ""}`}/>
               </button>
+
+              {/* Dropdown */}
               {userOpen && (
-                <div className="absolute right-0 top-full mt-2 w-52 bg-[#141929] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
-                  {/* User info */}
-                  <div className="px-4 py-3 border-b border-white/8">
-                    <div className="flex items-center gap-2.5">
+                <div className="absolute right-0 top-full mt-2.5 w-64 rounded-2xl shadow-2xl shadow-black/60 overflow-hidden z-50 border border-white/10"
+                  style={{background:"linear-gradient(145deg,#141929,#0f1422)"}}>
+
+                  {/* Top strip */}
+                  <div className="h-0.5 w-full" style={{background:"linear-gradient(90deg,#92400e,#f59e0b,#fcd34d,#f59e0b,#92400e)"}}/>
+
+                  {/* User info header */}
+                  <div className="px-4 py-4 border-b border-white/6">
+                    <div className="flex items-center gap-3">
                       {user.avatar
-                        ? <img src={user.avatar} alt="" className="w-8 h-8 rounded-xl object-cover"/>
-                        : <div className="w-8 h-8 rounded-xl bg-yellow-500 flex items-center justify-center text-slate-900 font-bold text-sm">{user.name?.[0]?.toUpperCase()}</div>
+                        ? <img src={user.avatar} alt="" className="w-10 h-10 rounded-xl object-cover ring-2 ring-yellow-500/30"/>
+                        : <div className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-900 font-bold text-base shadow-lg shadow-yellow-500/20 ring-2 ring-yellow-500/20"
+                            style={{background:"linear-gradient(135deg,#f59e0b,#d97706)"}}>
+                            {user.name?.[0]?.toUpperCase()}
+                          </div>
                       }
-                      <div className="min-w-0">
-                        <p className="text-white text-sm font-semibold truncate">{user.name}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-white text-sm font-bold truncate">{user.name}</p>
                         <p className="text-slate-500 text-xs truncate">{user.email}</p>
                       </div>
+                      {/* Online dot */}
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-lg shadow-emerald-400/40 shrink-0"/>
                     </div>
                   </div>
-                  {/* Profile link */}
+
+                  {/* My Profile */}
                   <button
                     onClick={() => { onNavigate("profile"); setUserOpen(false); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors border-b border-white/8"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:text-white hover:bg-white/5 transition-all group border-b border-white/6"
                   >
-                    <User size={14} className="text-yellow-400" /> My Profile
+                    <div className="w-7 h-7 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center group-hover:bg-yellow-500/20 transition-colors">
+                      <User size={13} className="text-yellow-400"/>
+                    </div>
+                    <span className="font-medium">My Profile</span>
+                    <ChevronRight size={13} className="ml-auto text-slate-600 group-hover:text-slate-400 transition-colors"/>
                   </button>
-                  {/* Phone number status */}
-                  <div className="px-4 py-2.5 border-b border-white/8">
-                    <p className="text-slate-600 text-xs">
-                      {user.phone_number
-                        ? <span className="text-emerald-400">📱 {user.phone_number}</span>
-                        : <span className="text-orange-400 cursor-pointer" onClick={() => { onNavigate("profile"); setUserOpen(false); }}>⚠️ Add phone for SMS alerts</span>
-                      }
-                    </p>
+
+                  {/* Phone number */}
+                  <div className="px-4 py-3 border-b border-white/6">
+                    {user.phone_number ? (
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                          <Phone size={12} className="text-emerald-400"/>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-emerald-400 text-xs font-semibold truncate">{user.phone_number}</p>
+                          <p className="text-slate-600 text-[10px]">SMS & WhatsApp enabled</p>
+                        </div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"/>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { onNavigate("profile"); setUserOpen(false); }}
+                        className="w-full flex items-center gap-3 group"
+                      >
+                        <div className="w-7 h-7 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
+                          <Phone size={12} className="text-orange-400"/>
+                        </div>
+                        <div className="min-w-0 text-left">
+                          <p className="text-orange-400 text-xs font-semibold">Add phone number</p>
+                          <p className="text-slate-600 text-[10px]">Get court date reminders</p>
+                        </div>
+                        <ChevronRight size={12} className="ml-auto text-orange-500/40 group-hover:text-orange-400 transition-colors shrink-0"/>
+                      </button>
+                    )}
                   </div>
+
                   {/* Sign out */}
                   <button
                     onClick={() => { logout(); setUserOpen(false); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/8 transition-all group"
                   >
-                    <LogOut size={14} /> Sign Out
+                    <div className="w-7 h-7 rounded-lg bg-red-500/8 border border-red-500/15 flex items-center justify-center group-hover:bg-red-500/15 transition-colors">
+                      <LogOut size={12} className="text-red-400"/>
+                    </div>
+                    <span className="font-medium">Sign Out</span>
                   </button>
                 </div>
               )}
