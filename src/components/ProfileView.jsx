@@ -116,6 +116,7 @@ export default function ProfileView({ onBack, onViewReport }) {
       if (d.error) { setError(d.error); return; }
       setProfile(p => ({ ...p, user: { ...p.user, name: d.user.name } }));
       setEditName(false);
+      await refreshUser(); // update navbar immediately
       setSuccess("Name updated!"); setTimeout(() => setSuccess(""), 3000);
     } catch { setError("Failed."); } finally { setSavingName(false); }
   };
@@ -244,7 +245,9 @@ export default function ProfileView({ onBack, onViewReport }) {
                           <input type="text" value={newName}
                             onChange={e => setNewName(e.target.value)}
                             onKeyDown={e => e.key === "Enter" && saveName()} autoFocus
-                            className="flex-1 bg-white/8 border border-yellow-500/50 focus:border-yellow-500 rounded-xl px-4 py-2.5 text-white text-2xl font-bold font-serif focus:outline-none transition-all"/>
+                            className="flex-1 bg-[#1a1f35] border border-yellow-500/50 focus:border-yellow-500 rounded-xl px-4 py-2.5 text-white text-2xl font-bold font-serif focus:outline-none transition-all placeholder-slate-600"
+                            placeholder="Enter your name"
+                          />
                           <button onClick={saveName} disabled={savingName}
                             className="p-2.5 rounded-xl bg-yellow-500 text-slate-900 hover:bg-yellow-400 transition-all shrink-0">
                             {savingName ? <Loader2 size={15} className="animate-spin"/> : <Check size={15}/>}
@@ -343,7 +346,7 @@ export default function ProfileView({ onBack, onViewReport }) {
                         value={newPhone.replace(/^\+91/,"").replace(/\D/g,"")}
                         onChange={e => setNewPhone(e.target.value.replace(/\D/g,"").slice(0,10))}
                         placeholder="9876543210" maxLength={10} autoFocus
-                        className="flex-1 bg-white/5 border border-yellow-500/40 focus:border-yellow-500 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-600 focus:outline-none transition-all"/>
+                        className="flex-1 bg-[#1a1f35] border border-yellow-500/40 focus:border-yellow-500 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-600 focus:outline-none transition-all"/>
                     </div>
                     <p className="text-slate-700 text-xs">Enter 10-digit number without country code</p>
                     <div className="flex gap-2">
