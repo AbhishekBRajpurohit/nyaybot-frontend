@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Scale, Globe, Home, Search, Users, FileText, History, Bell, ChevronDown, LogOut, User } from "lucide-react";
+import { Scale, Globe, Home, Search, Users, FileText, History, Bell, ChevronDown, ChevronRight, LogOut, User, Phone } from "lucide-react";
 import { t } from "../i18n";
 import { useAuth } from "./AuthContext";
 
@@ -22,6 +22,18 @@ export default function Navbar({ activeView = "home", onNavigate, lang = "en", l
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.target.closest("[data-dropdown]")) {
+        setLangOpen(false);
+        setUserOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   const NAV_ITEMS = [
@@ -73,9 +85,7 @@ export default function Navbar({ activeView = "home", onNavigate, lang = "en", l
         {/* Right side */}
         <div className="flex items-center space-x-4 shrink-0">
           {/* Language dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setLangOpen(!langOpen)}
+          <div className="relative" data-dropdown>
               className="flex items-center space-x-2 px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-slate-300 hover:border-yellow-500/40 hover:text-white transition-all duration-200 whitespace-nowrap"
             >
               <Globe size={16} className="text-yellow-500" />
@@ -101,7 +111,7 @@ export default function Navbar({ activeView = "home", onNavigate, lang = "en", l
           </div>
 
           {user ? (
-            <div className="relative">
+            <div className="relative" data-dropdown>
               {/* Trigger button */}
               <button
                 onClick={() => setUserOpen(!userOpen)}
