@@ -11,9 +11,7 @@ const LANGUAGES = [
   "English",
   "Hindi (हिंदी)",
   "Kannada (ಕನ್ನಡ)",
-  "Tamil (தமிழ்)",
-  "Telugu (తెలుగు)",
-  "Marathi (मराठी)",
+  
 ];
 
 export default function Navbar({
