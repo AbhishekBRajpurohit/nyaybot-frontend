@@ -107,6 +107,63 @@ function parseReportData(aiText, inputText) {
   const summaryMatch = aiText?.match(/summary[:\s]+([^#\n]{40,300})/i);
   const summary = summaryMatch ? summaryMatch[1].trim()
     : `Case analysis complete. ${sections.length>0?`Charges: ${sections.map(s=>`${s.code} (${s.name})`).join(", ")}.`:""}  Please consult a qualified lawyer.`;
+
+  // ── Extract timeline from AI response ──────────────────────────────────
+  // Try to parse sentences like "3-5 years", "life imprisonment", "24 months", "rigorous imprisonment for 7 years"
+  let timeline = "18 months"; // default
+  let timelineNote = "";
+
+  const lowerAI = (aiText||"").toLowerCase();
+
+  // Life imprisonment check — POCSO, murder, rape
+  if (
+    lowerAI.includes("life imprisonment") ||
+    lowerAI.includes("imprisonment for life") ||
+    lowerAI.includes("death penalty") ||
+    lowerAI.includes("capital punishment") ||
+    lowerAI.includes("death sentence")
+  ) {
+    timeline = "Life / Death";
+    timelineNote = "Life imprisonment or death penalty possible";
+  }
+  // Check for year ranges like "3 to 7 years", "7-10 years"
+  else if (!timeline.includes("Life")) {
+    const yearRangeMatch = lowerAI.match(/(\d+)\s*(?:to|-)\s*(\d+)\s*years?/);
+    if (yearRangeMatch) {
+      const maxYrs = parseInt(yearRangeMatch[2]);
+      timeline = `${yearRangeMatch[1]}-${yearRangeMatch[2]} years`;
+      timelineNote = `Up to ${maxYrs} years based on charges`;
+    } else {
+      // Single year mention like "10 years", "7 years"
+      const yearMatch = lowerAI.match(/(\d+)\s*years?\s*(?:imprisonment|rigorous|simple)?/);
+      if (yearMatch) {
+        const yrs = parseInt(yearMatch[1]);
+        if (yrs >= 1 && yrs <= 50) {
+          timeline = `~${yrs} years`;
+          timelineNote = `Based on maximum sentence for charges`;
+        }
+      } else {
+        // Month mention like "24 months"
+        const monthMatch = lowerAI.match(/(\d+)\s*months?\s*(?:imprisonment)?/);
+        if (monthMatch) {
+          const mos = parseInt(monthMatch[1]);
+          if (mos >= 1 && mos <= 600) {
+            timeline = `~${mos} months`;
+          }
+        }
+      }
+    }
+  }
+
+  // Case-type based overrides if AI didn't specify clearly
+  if (timeline === "18 months") {
+    if (caseType === "POCSO")    { timeline = "7+ years";    timelineNote = "POCSO minimum 7 years, up to life"; }
+    else if (caseType === "Murder")   { timeline = "Life / Death"; timelineNote = "IPC 302 — life imprisonment or death"; }
+    else if (caseType === "Cyber")    { timeline = "2-7 years";    timelineNote = "Based on IT Act provisions"; }
+    else if (caseType === "Financial"){ timeline = "3-7 years";    timelineNote = "PMLA — rigorous imprisonment"; }
+    else if (caseType === "Family")   { timeline = "6-24 months";  timelineNote = "Based on case complexity"; }
+  }
+
   return {
     generatedAt:now, caseType,
     inputQuery: inputText||"Case details submitted",
@@ -114,7 +171,7 @@ function parseReportData(aiText, inputText) {
     bailLabel: bailPct>=65?"Likely Granted":bailPct>=35?"Uncertain — Court Discretion":"Likely Denied",
     bailColor: bailPct>=65?"emerald":bailPct>=35?"yellow":"red",
     detentionLegal:!combined.toLowerCase().includes("illegal detention"),
-    timeline:18, rights, hearings, lawyers,
+    timeline, timelineNote, rights, hearings, lawyers,
   };
 }
 
