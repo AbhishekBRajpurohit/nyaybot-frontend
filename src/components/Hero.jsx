@@ -70,14 +70,24 @@ async function callGroq({ text, images }) {
   }
 
   const systemPrompt = `You are NyayBot, an expert Indian legal AI assistant.
-Analyze the user's case details or FIR document and provide:
-1. 📋 Key Legal Issues
-2. ⚖️ Applicable Laws & Sections (IPC/BNS, BNSS, CrPC etc.)
-3. 🔍 Important Facts Extracted
-4. 📝 Recommended Next Steps
-5. 🔓 Bail Possibility (if relevant)
-IMPORTANT: Always respond in English only, regardless of what language the user writes in.
-Be clear, simple and helpful for common people who don't understand legal language.`;
+Analyze the user's case details or FIR document and provide a structured response with EXACTLY these sections:
+
+1. KEY LEGAL ISSUES
+2. APPLICABLE LAWS & SECTIONS (list all IPC/BNS/POCSO/PMLA sections with section numbers)
+3. IMPORTANT FACTS EXTRACTED
+4. RECOMMENDED NEXT STEPS
+5. BAIL POSSIBILITY (state clearly if bailable or non-bailable, and estimated bail probability as a percentage like "Bail Probability: 25%")
+6. ESTIMATED TIMELINE: (IMPORTANT - be specific, examples: "Life imprisonment", "7 to 10 years rigorous imprisonment", "3 to 5 years", "Death penalty possible", "2 years maximum". Always start this section with "ESTIMATED TIMELINE:")
+
+Rules:
+- For POCSO cases: always state minimum 7 years up to life imprisonment
+- For murder (IPC 302): always state life imprisonment or death penalty
+- For rape (IPC 376): minimum 10 years up to life imprisonment
+- For money laundering: 3 to 7 years rigorous imprisonment
+- Always respond in English only
+- Be clear and simple for common people who don't understand legal language
+- Always include exact section numbers when citing laws`;
+
 
   // Build user content
   // Note: Groq's free models (llama-3.2-11b-vision-preview) support vision
@@ -169,7 +179,7 @@ export default function Hero({
   const [aiResponse, setAiResponse] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiError, setAiError] = useState("");
-  const [previewImage, setPreviewImage] = useState(null); // lightbox
+  const [previewImage, setPreviewImage] = useState(null);
 
   const textareaRef = useRef(null);
   const videoRef = useRef(null);
@@ -350,14 +360,17 @@ export default function Hero({
       let bailPct = 65;
       const bailMatch = response.match(/(\d{2,3})\s*%/);
       if (bailMatch) bailPct = Math.min(95, parseInt(bailMatch[1]));
-      if (response.toLowerCase().includes("bail is generally not granted") || response.toLowerCase().includes("non-bailable")) bailPct = Math.min(bailPct, 30);
+      if (response.toLowerCase().includes("bail is generally not granted") ||
+          response.toLowerCase().includes("non-bailable") ||
+          response.toLowerCase().includes("pocso") ||
+          response.toLowerCase().includes("life imprisonment")) bailPct = Math.min(bailPct, 25);
       else if (response.toLowerCase().includes("bailable")) bailPct = Math.max(bailPct, 72);
 
       // Save to localStorage
       const reportPayload = { aiResponse: response, inputText: text, timestamp: Date.now() };
       try { localStorage.setItem("nyaybot_report", JSON.stringify(reportPayload)); } catch (_) {}
 
-      // Save to history (silently)
+      // Save to history (silently — only works if logged in)
       try {
         await fetch("http://localhost:4000/api/history/save", {
           method: "POST",
@@ -442,9 +455,9 @@ export default function Hero({
               <img
                 src={img.dataUrl}
                 alt="Attached"
-                className="w-16 h-16 rounded-xl object-cover border border-yellow-500/30 cursor-pointer hover:border-yellow-500/80 hover:scale-105 transition-all"
                 onClick={() => setPreviewImage(img.dataUrl)}
-                title="Click to expand"
+                className="w-16 h-16 rounded-xl object-cover border border-yellow-500/30 cursor-pointer hover:border-yellow-500/70 hover:scale-105 transition-all"
+                title="Click to preview"
               />
               <button
                 onClick={() => removeImage(img.id)}
@@ -660,32 +673,20 @@ export default function Hero({
     return (
       <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0a0a0a] pt-24 pb-16">
 
-        {/* ── Image Lightbox ── */}
+        {/* Lightbox */}
         {previewImage && (
-          <div
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-sm"
-            onClick={() => setPreviewImage(null)}
-          >
-            <button
-              onClick={() => setPreviewImage(null)}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-all z-10"
-            >
-              <X size={20} />
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-sm"
+            onClick={() => setPreviewImage(null)}>
+            <button onClick={() => setPreviewImage(null)}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-all z-10">
+              <X size={20}/>
             </button>
-            <div
-              className="relative max-w-[90vw] max-h-[90vh] rounded-2xl overflow-hidden shadow-2xl border border-white/10"
-              onClick={e => e.stopPropagation()}
-            >
-              <img
-                src={previewImage}
-                alt="Preview"
-                className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl"
-              />
+            <div className="relative max-w-[90vw] max-h-[90vh] rounded-2xl overflow-hidden shadow-2xl border border-white/10"
+              onClick={e => e.stopPropagation()}>
+              <img src={previewImage} alt="Preview" className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl"/>
               <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm px-4 py-2.5 flex items-center justify-between">
-                <span className="text-white/70 text-xs">Click outside or X to close</span>
-                <button onClick={() => setPreviewImage(null)} className="text-xs text-yellow-400 font-semibold hover:text-yellow-300 transition-colors">
-                  Close Preview
-                </button>
+                <span className="text-white/60 text-xs">Click outside or X to close</span>
+                <button onClick={() => setPreviewImage(null)} className="text-xs text-yellow-400 font-semibold hover:text-yellow-300">Close</button>
               </div>
             </div>
           </div>
@@ -722,39 +723,20 @@ export default function Hero({
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0a0a0a] pt-24 pb-16">
 
-      {/* ── Image Lightbox / Preview Modal ── */}
+      {/* Lightbox */}
       {previewImage && (
-        <div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-sm"
-          onClick={() => setPreviewImage(null)}
-        >
-          {/* Close button */}
-          <button
-            onClick={() => setPreviewImage(null)}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-all z-10"
-          >
-            <X size={20} />
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-sm"
+          onClick={() => setPreviewImage(null)}>
+          <button onClick={() => setPreviewImage(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-all z-10">
+            <X size={20}/>
           </button>
-
-          {/* Image */}
-          <div
-            className="relative max-w-[90vw] max-h-[90vh] rounded-2xl overflow-hidden shadow-2xl border border-white/10"
-            onClick={e => e.stopPropagation()}
-          >
-            <img
-              src={previewImage}
-              alt="Preview"
-              className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl"
-            />
-            {/* Bottom bar */}
+          <div className="relative max-w-[90vw] max-h-[90vh] rounded-2xl overflow-hidden shadow-2xl border border-white/10"
+            onClick={e => e.stopPropagation()}>
+            <img src={previewImage} alt="Preview" className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl"/>
             <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm px-4 py-2.5 flex items-center justify-between">
-              <span className="text-white/70 text-xs">Click outside or X to close</span>
-              <button
-                onClick={() => setPreviewImage(null)}
-                className="text-xs text-yellow-400 font-semibold hover:text-yellow-300 transition-colors"
-              >
-                Close Preview
-              </button>
+              <span className="text-white/60 text-xs">Click outside or X to close</span>
+              <button onClick={() => setPreviewImage(null)} className="text-xs text-yellow-400 font-semibold hover:text-yellow-300">Close</button>
             </div>
           </div>
         </div>
