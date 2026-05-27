@@ -164,9 +164,9 @@ export default function AlertsView({ onBack, onViewReport }) {
         <div className="flex items-start gap-3 p-3.5 rounded-xl bg-yellow-500/8 border border-yellow-500/20">
           <Bell size={15} className="text-yellow-400 shrink-0 mt-0.5" />
           <p className="text-slate-400 text-sm leading-relaxed">
-            You will receive <strong className="text-white">2 notifications</strong> per alert —
+            You will receive <strong className="text-white">2 notifications</strong> per alert -
             one <strong className="text-white">1 day before</strong> and one
-            <strong className="text-white"> 30 minutes before</strong> the hearing — as both
+            <strong className="text-white"> 30 minutes before</strong> the hearing - as both
             browser popup and in-app toast on any page.
           </p>
         </div>
@@ -210,16 +210,16 @@ export default function AlertsView({ onBack, onViewReport }) {
                     onChange={e => handleLinkCase(e.target.value)}
                     className="w-full bg-white/5 border border-white/10 focus:border-yellow-500/50 rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition-all"
                   >
-                    <option value="">— Select a case from history —</option>
+                    <option value="">- Select a case from history -</option>
                     {history.map(h => (
                       <option key={h.id} value={h.id} className="bg-[#0d1020]">
-                        {h.case_type} — {h.input_text?.slice(0, 50) || "No text"}
+                        {h.case_type} - {h.input_text?.slice(0, 50) || "No text"}
                       </option>
                     ))}
                   </select>
                   {linkedHistoryId && (
                     <p className="mt-1 text-emerald-400 text-xs flex items-center gap-1">
-                      <CheckCircle size={11} /> Linked — "View case report" will appear on this alert
+                      <CheckCircle size={11} /> Linked - "View case report" will appear on this alert
                     </p>
                   )}
                 </div>

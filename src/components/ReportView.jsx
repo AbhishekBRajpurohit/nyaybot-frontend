@@ -96,6 +96,19 @@ function parseReportData(aiText, inputText) {
     if (!sections.find(s => s.code === code))
       sections.push({ code, name: `BNS Section ${m[1]}`, bailable: true });
   }
+  // Also capture mentions like "Section 302", "Sec. 302", "s. 302" and "302 IPC"
+  const secRx = /\b(?:section|sec\.?|s\.?)(?:\s+of)?\s*(\d{2,4}[A-Z]?)\b/gi;
+  while ((m = secRx.exec(combined)) !== null) {
+    const code = `IPC ${m[1]}`;
+    if (!sections.find(s => s.code === code))
+      sections.push({ code, name: getSectionName(m[1]), bailable: isBailable(m[1]) });
+  }
+  const numBeforeIPCRx = /(\d{2,4}[A-Z]?)\s*IPC/gi;
+  while ((m = numBeforeIPCRx.exec(combined)) !== null) {
+    const code = `IPC ${m[1]}`;
+    if (!sections.find(s => s.code === code))
+      sections.push({ code, name: getSectionName(m[1]), bailable: isBailable(m[1]) });
+  }
   let bailPct = 65;
   const bailMatch = aiText?.match(/(\d{2,3})\s*%/);
   if (bailMatch) bailPct = Math.min(95, parseInt(bailMatch[1]));
