@@ -52,6 +52,32 @@ function RenderMarkdown({ text }) {
   return <div>{elements}</div>;
 }
 
+// ─── FIX: Smart timeline formatter ───────────────────────────────────────────
+// Returns { display, isSevere }
+// display = nice readable string
+// isSevere = true if Life/Death (show red color)
+function formatTimeline(timeline) {
+  if (!timeline) return { display: "~18 months", isSevere: false };
+
+  const t = timeline.toLowerCase().trim();
+
+  // Life / Death cases
+  if (t.includes("life") || t.includes("death")) {
+    return { display: "Life / Death Penalty", isSevere: true };
+  }
+
+  // Already has "years" or "months" — just clean it up
+  if (t.includes("year")) {
+    return { display: timeline.replace(/^~/, "") + " (est.)", isSevere: false };
+  }
+  if (t.includes("month")) {
+    return { display: timeline.replace(/^~/, ""), isSevere: false };
+  }
+
+  // Fallback — just show as-is
+  return { display: timeline, isSevere: false };
+}
+
 // ─── Data parser ─────────────────────────────────────────────────────────────
 function parseReportData(aiText, inputText) {
   const now = new Date();
@@ -109,13 +135,11 @@ function parseReportData(aiText, inputText) {
     : `Case analysis complete. ${sections.length>0?`Charges: ${sections.map(s=>`${s.code} (${s.name})`).join(", ")}.`:""}  Please consult a qualified lawyer.`;
 
   // ── Extract timeline from AI response ──────────────────────────────────
-  // Try to parse sentences like "3-5 years", "life imprisonment", "24 months", "rigorous imprisonment for 7 years"
-  let timeline = "18 months"; // default
+  let timeline = "18 months";
   let timelineNote = "";
 
   const lowerAI = (aiText||"").toLowerCase();
 
-  // Life imprisonment check — POCSO, murder, rape
   if (
     lowerAI.includes("life imprisonment") ||
     lowerAI.includes("imprisonment for life") ||
@@ -126,15 +150,13 @@ function parseReportData(aiText, inputText) {
     timeline = "Life / Death";
     timelineNote = "Life imprisonment or death penalty possible";
   }
-  // Check for year ranges like "3 to 7 years", "7-10 years"
-  else if (!timeline.includes("Life")) {
+  else {
     const yearRangeMatch = lowerAI.match(/(\d+)\s*(?:to|-)\s*(\d+)\s*years?/);
     if (yearRangeMatch) {
       const maxYrs = parseInt(yearRangeMatch[2]);
       timeline = `${yearRangeMatch[1]}-${yearRangeMatch[2]} years`;
       timelineNote = `Up to ${maxYrs} years based on charges`;
     } else {
-      // Single year mention like "10 years", "7 years"
       const yearMatch = lowerAI.match(/(\d+)\s*years?\s*(?:imprisonment|rigorous|simple)?/);
       if (yearMatch) {
         const yrs = parseInt(yearMatch[1]);
@@ -143,7 +165,6 @@ function parseReportData(aiText, inputText) {
           timelineNote = `Based on maximum sentence for charges`;
         }
       } else {
-        // Month mention like "24 months"
         const monthMatch = lowerAI.match(/(\d+)\s*months?\s*(?:imprisonment)?/);
         if (monthMatch) {
           const mos = parseInt(monthMatch[1]);
@@ -155,13 +176,12 @@ function parseReportData(aiText, inputText) {
     }
   }
 
-  // Case-type based overrides if AI didn't specify clearly
   if (timeline === "18 months") {
-    if (caseType === "POCSO")    { timeline = "7+ years";    timelineNote = "POCSO minimum 7 years, up to life"; }
-    else if (caseType === "Murder")   { timeline = "Life / Death"; timelineNote = "IPC 302 — life imprisonment or death"; }
-    else if (caseType === "Cyber")    { timeline = "2-7 years";    timelineNote = "Based on IT Act provisions"; }
-    else if (caseType === "Financial"){ timeline = "3-7 years";    timelineNote = "PMLA — rigorous imprisonment"; }
-    else if (caseType === "Family")   { timeline = "6-24 months";  timelineNote = "Based on case complexity"; }
+    if (caseType === "POCSO")     { timeline = "Life / Death";   timelineNote = "POCSO minimum 7 years, up to life"; }
+    else if (caseType === "Murder")    { timeline = "Life / Death";   timelineNote = "IPC 302 — life imprisonment or death"; }
+    else if (caseType === "Cyber")     { timeline = "2-7 years";      timelineNote = "Based on IT Act provisions"; }
+    else if (caseType === "Financial") { timeline = "3-7 years";      timelineNote = "PMLA — rigorous imprisonment"; }
+    else if (caseType === "Family")    { timeline = "6-24 months";    timelineNote = "Based on case complexity"; }
   }
 
   return {
@@ -230,8 +250,7 @@ function LawyerCard({ lawyer }) {
   );
 }
 
-
-// ─── PDF Generator — Professional Legal Document ─────────────────────────────
+// ─── PDF Generator ────────────────────────────────────────────────────────────
 function generatePDF(data, fmtFull) {
   try {
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -242,25 +261,11 @@ function generatePDF(data, fmtFull) {
     const cW  = W - mL - mR;
     let y     = 20;
 
-    // ── Safe color setters (no spread) ──────────────────────────────────
     const fc = (r,g,b)   => doc.setFillColor(r,g,b);
     const tc = (r,g,b)   => doc.setTextColor(r,g,b);
     const dc = (r,g,b)   => doc.setDrawColor(r,g,b);
     const fs = (s,st="normal") => { doc.setFontSize(s); doc.setFont("helvetica",st); };
-
-    // ── Helpers ──────────────────────────────────────────────────────────
     const nl = (n=5) => { y += n; };
-
-    const addFooter = () => {
-      const p = doc.internal.getNumberOfPages();
-      dc(212,160,23); doc.setLineWidth(0.3);
-      doc.line(mL, H-12, W-mR, H-12);
-      fs(7); tc(140,110,30);
-      doc.text("NyayBot AI  |  Justice Made Understandable  |  nyaybot.in", mL, H-7);
-      doc.text(`Page ${p}`, W-mR, H-7, { align: "right" });
-      tc(150,150,150);
-      doc.text("This report does not constitute legal advice.", W/2, H-7, { align: "center" });
-    };
 
     const newPage = () => {
       doc.addPage();
@@ -272,11 +277,6 @@ function generatePDF(data, fmtFull) {
 
     const hrGold = () => {
       dc(212,160,23); doc.setLineWidth(0.3);
-      doc.line(mL, y, W-mR, y); nl(4);
-    };
-
-    const hrLight = () => {
-      dc(220,220,220); doc.setLineWidth(0.2);
       doc.line(mL, y, W-mR, y); nl(4);
     };
 
@@ -294,26 +294,17 @@ function generatePDF(data, fmtFull) {
       lines.forEach(line => { chk(6); doc.text(line, x, y); nl(5); });
     };
 
-    // ════════════════════════════════════════════════════════════════════
-    // WHITE BACKGROUND
-    // ════════════════════════════════════════════════════════════════════
     fc(255,255,255); doc.rect(0,0,W,H,"F");
 
-    // ── GOLD HEADER BANNER ───────────────────────────────────────────────
+    // Header banner
     fc(212,160,23); doc.rect(0,0,W,30,"F");
-
-    // Logo circle
     fc(20,20,20); doc.circle(mL+9, 15, 9, "F");
     fs(8,"bold"); tc(212,160,23);
     doc.text("NY", mL+5.5, 17);
-
-    // Title
     fs(20,"bold"); tc(255,255,255);
     doc.text("NyayBot", mL+24, 13);
     fs(7.5,"normal"); tc(30,20,0);
     doc.text("AI-POWERED LEGAL CASE REPORT", mL+24, 21);
-
-    // Right side of banner
     fs(7,"normal"); tc(30,20,0);
     doc.text("Generated: " + fmtFull(data.generatedAt), W-mR, 11, { align:"right" });
     fs(7,"bold"); tc(20,20,20);
@@ -321,19 +312,18 @@ function generatePDF(data, fmtFull) {
 
     y = 38;
 
-    // ── CASE OVERVIEW BOX ───────────────────────────────────────────────
+    // Case Overview Box — FIX: use formatTimeline for display
+    const { display: tlDisplay } = formatTimeline(data.timeline);
     fc(252,248,235); doc.roundedRect(mL, y, cW, 40, 2, 2, "F");
     dc(212,160,23); doc.setLineWidth(0.5);
     doc.roundedRect(mL, y, cW, 40, 2, 2, "S");
-
     fs(8,"bold"); tc(110,80,10);
     doc.text("CASE OVERVIEW", mL+5, y+8);
 
-    // 4 columns inside box
     const ovCols = [
       ["Case Type",      data.caseType],
       ["Sections Found", String(data.sections.length)],
-      ["Est. Timeline",  data.timeline+" months"],
+      ["Est. Timeline",  tlDisplay],                    // ← FIXED: no hardcoded "months"
       ["Detention",      data.detentionLegal ? "Within Limits" : "Check Required"],
     ];
     const colW = cW / 4;
@@ -341,26 +331,27 @@ function generatePDF(data, fmtFull) {
       const cx = mL + i*colW + 5;
       fs(7,"normal"); tc(130,100,30);
       doc.text(label, cx, y+19);
-      fs(10,"bold");
+      fs(i===2 && val.length > 12 ? 8 : 10,"bold"); // smaller font if long text
       if (i === 3) {
         data.detentionLegal ? tc(20,130,60) : tc(185,28,28);
+      } else if (i === 2 && data.timeline.toLowerCase().includes("life")) {
+        tc(185,28,28); // red for life/death
       } else {
         tc(20,20,20);
       }
-      doc.text(val, cx, y+30);
+      // Wrap long timeline text
+      const valLines = doc.splitTextToSize(val, colW - 8);
+      valLines.forEach((vl, vi) => doc.text(vl, cx, y+28+(vi*5)));
     });
 
-    // Column dividers
     for (let i=1; i<4; i++) {
       dc(212,160,23); doc.setLineWidth(0.2);
       doc.line(mL + i*colW, y+12, mL + i*colW, y+37);
     }
     y += 47;
 
-    // ── YOUR QUERY ───────────────────────────────────────────────────────
     if (data.inputQuery) {
-      chk(20);
-      nl(2);
+      chk(20); nl(2);
       fs(7,"bold"); tc(120,90,20);
       doc.text("YOUR QUERY", mL, y); nl(5);
       fc(245,245,245); dc(200,190,160); doc.setLineWidth(0.3);
@@ -372,43 +363,30 @@ function generatePDF(data, fmtFull) {
       y += 5;
     }
 
-    // ── PLAIN LANGUAGE SUMMARY ───────────────────────────────────────────
     sectionHead("PLAIN-LANGUAGE SUMMARY");
     multiLine(data.summary, mL, cW, 9, 40,40,40);
     nl(2);
 
-    // ── BAIL PROBABILITY ─────────────────────────────────────────────────
     sectionHead("BAIL PROBABILITY ASSESSMENT");
     chk(38);
 
-    // Color based on bail
-    let bailR=22,bailG=163,bailB=74; // green
+    let bailR=22,bailG=163,bailB=74;
     let bgR=235,bgG=250,bgB=242;
     if (data.bailColor==="yellow") { bailR=161;bailG=120;bailB=0; bgR=253;bgG=248;bgB=225; }
     if (data.bailColor==="red")    { bailR=185;bailG=28; bailB=28;bgR=253;bgG=235;bgB=235; }
 
     fc(bgR,bgG,bgB); dc(bailR,bailG,bailB); doc.setLineWidth(0.5);
     doc.roundedRect(mL, y, cW, 35, 2, 2, "FD");
-
-    // Big %
     fs(32,"bold"); tc(bailR,bailG,bailB);
     doc.text(data.bailPct+"%", mL+8, y+24);
-
-    // Label
     fs(11,"bold"); tc(bailR,bailG,bailB);
     doc.text(data.bailLabel, mL+42, y+13);
-
-    // Progress bar background
     fc(210,210,210);
     doc.roundedRect(mL+42, y+16, cW-52, 5, 1,1, "F");
-    // Progress bar fill
     fc(bailR,bailG,bailB);
     doc.roundedRect(mL+42, y+16, (cW-52)*(data.bailPct/100), 5, 1,1, "F");
-
-    // Reasoning
     fs(7.5,"normal"); tc(bailR,bailG,bailB);
     doc.text("AI-based assessment. Consult a qualified lawyer for accurate evaluation.", mL+42, y+27);
-
     y += 42;
 
     if (data.sections.some(s=>s.bailable)) {
@@ -421,18 +399,14 @@ function generatePDF(data, fmtFull) {
     }
     nl(2);
 
-    // ── LEGAL SECTIONS ───────────────────────────────────────────────────
     if (data.sections.length > 0) {
       sectionHead("IDENTIFIED LEGAL SECTIONS");
-
-      // Table header
       fc(212,160,23); doc.rect(mL, y, cW, 8, "F");
       fs(7.5,"bold"); tc(255,255,255);
       doc.text("Section",    mL+4,    y+5.5);
       doc.text("Description",mL+38,   y+5.5);
       doc.text("Status",     W-mR-22, y+5.5);
       nl(8);
-
       data.sections.forEach((sec, i) => {
         chk(10);
         if (i%2===0) { fc(249,246,235); dc(235,225,200); doc.setLineWidth(0.1); doc.rect(mL, y-3, cW, 9, "FD"); }
@@ -446,11 +420,10 @@ function generatePDF(data, fmtFull) {
       nl(3);
     }
 
-    // ── DETENTION + TIMELINE ─────────────────────────────────────────────
+    // Detention + Timeline section — FIX: smart display
     sectionHead("ILLEGAL DETENTION CHECK & TIMELINE");
     chk(22);
 
-    // Left box - detention
     if (data.detentionLegal) { fc(235,250,242); dc(22,120,60); }
     else                     { fc(253,235,235); dc(185,28,28); }
     doc.setLineWidth(0.4);
@@ -460,17 +433,17 @@ function generatePDF(data, fmtFull) {
     fs(8,"normal"); tc(30,30,30);
     doc.text(data.detentionLegal?"Within Legal Limits":"Potentially Illegal", mL+4, y+14);
 
-    // Right box - timeline
+    // ── FIX: Timeline box — no hardcoded "months" ──
+    const { display: tlDisp, isSevere } = formatTimeline(data.timeline);
     fc(245,245,245); dc(200,190,160); doc.setLineWidth(0.3);
     doc.roundedRect(mL+cW/2+3, y, cW/2-3, 18, 2,2, "FD");
     fs(7.5,"bold"); tc(100,80,20);
     doc.text("Estimated Timeline", mL+cW/2+7, y+7);
-    fs(8,"normal"); tc(30,30,30);
-    doc.text("~"+data.timeline+" months to resolution", mL+cW/2+7, y+14);
+    fs(8,"normal"); isSevere ? tc(185,28,28) : tc(30,30,30);
+    doc.text(tlDisp, mL+cW/2+7, y+14);
 
     y += 25;
 
-    // ── UPCOMING HEARINGS ────────────────────────────────────────────────
     sectionHead("UPCOMING HEARINGS");
     data.hearings.forEach((h, i) => {
       chk(11);
@@ -478,13 +451,11 @@ function generatePDF(data, fmtFull) {
       const isPast = h.date < new Date();
       const isNext = !isPast && i===data.hearings.findIndex(x=>!x.past);
 
-      // Highlight next hearing
       if (isNext) {
         fc(255,248,220); dc(212,160,23); doc.setLineWidth(0.3);
         doc.roundedRect(mL, y-3, cW, 10, 1,1, "FD");
       }
 
-      // Dot
       if (isPast)      { fc(180,180,180); }
       else if (isNext) { fc(212,160,23);  }
       else             { fc(50,130,200);  }
@@ -506,16 +477,12 @@ function generatePDF(data, fmtFull) {
     });
     nl(2);
 
-    // ── YOUR LEGAL RIGHTS ────────────────────────────────────────────────
     sectionHead("YOUR LEGAL RIGHTS");
     data.rights.forEach((right, i) => {
       chk(10);
-      // Number badge
       fc(212,160,23); doc.circle(mL+4, y+0.5, 3, "F");
       fs(6.5,"bold"); tc(255,255,255);
       doc.text(String(i+1), mL+4, y+1.8, {align:"center"});
-
-      // Right text
       const rLines = doc.splitTextToSize(right, cW-12);
       fs(8.5,"normal"); tc(35,35,35);
       rLines.forEach((line, li) => {
@@ -527,14 +494,12 @@ function generatePDF(data, fmtFull) {
     });
     nl(2);
 
-    // ── AI ANALYSIS ──────────────────────────────────────────────────────
     sectionHead("FULL AI LEGAL ANALYSIS");
-
     const cleanAI = (data.aiText || "No AI analysis available.")
       .replace(/\*\*/g,"").replace(/\*/g,"")
       .replace(/#{1,4}\s?/g,"")
       .replace(/`/g,"")
-      .replace(/[^\x00-\x7F]/g," ")  // strip all emojis & non-ASCII
+      .replace(/[^\x00-\x7F]/g," ")
       .replace(/\s+/g," ")
       .trim();
 
@@ -555,63 +520,38 @@ function generatePDF(data, fmtFull) {
     });
     nl(3);
 
-    // ── RECOMMENDED LAWYERS ──────────────────────────────────────────────
     sectionHead("RECOMMENDED LAWYERS NEAR YOU");
-
     data.lawyers.forEach((lw, i) => {
       chk(40);
       const boxH = 38;
-
-      // Card background alternating
       i%2===0 ? fc(252,249,240) : fc(248,252,248);
       dc(200,190,160); doc.setLineWidth(0.3);
       doc.roundedRect(mL, y, cW, boxH, 2,2, "FD");
-
-      // Gold left strip
       fc(212,160,23); doc.rect(mL, y, 3.5, boxH, "F");
-
-      // Number badge
       fc(20,20,20); doc.circle(mL+13, y+9, 6, "F");
       fs(8,"bold"); tc(212,160,23);
       doc.text(String(i+1), mL+13, y+11.5, {align:"center"});
-
-      // Name
       fs(10,"bold"); tc(15,15,15);
       doc.text(lw.name, mL+24, y+10);
-
-      // Pro Bono badge
       if (lw.proBono) {
         fc(22,120,60); doc.roundedRect(W-mR-24, y+4, 22, 7, 1,1, "F");
         fs(6,"bold"); tc(255,255,255);
         doc.text("PRO BONO", W-mR-20.5, y+9, {align:"center"});
       }
-
-      // Specialisation
       fs(8,"normal"); tc(80,65,30);
       doc.text(lw.spec+"  |  "+lw.area, mL+24, y+17);
-
-      // Stats row
       fs(7.5,"normal"); tc(55,55,55);
-      doc.text(
-        "Rating: "+lw.rating+"   |   "+lw.cases+" cases   |   "+lw.success+"% success   |   "+lw.exp+" yrs exp",
-        mL+24, y+24
-      );
-
-      // Contact
-      fs(7.5,"normal"); tc(55,55,55);
+      doc.text("Rating: "+lw.rating+"   |   "+lw.cases+" cases   |   "+lw.success+"% success   |   "+lw.exp+" yrs exp", mL+24, y+24);
       doc.text("Languages: "+lw.langs, mL+24, y+30);
       fs(7.5,"bold"); tc(110,80,10);
       const cleanFee = lw.fee.replace(/[^\x00-\x7F]/g,"Rs.").replace(/Rs\.Rs\./g,"Rs.");
       doc.text(cleanFee+"/hearing", W-mR-45, y+24);
       fs(7.5,"normal"); tc(55,55,55);
       doc.text("Ph: "+lw.phone, W-mR-45, y+30);
-
       y += boxH + 5;
     });
 
     nl(5);
-
-    // ── DISCLAIMER ───────────────────────────────────────────────────────
     chk(24);
     fc(255,245,225); dc(200,130,30); doc.setLineWidth(0.4);
     doc.roundedRect(mL, y, cW, 22, 2,2, "FD");
@@ -627,7 +567,6 @@ function generatePDF(data, fmtFull) {
     disc.forEach((l,i) => doc.text(l, mL+5, y+14+(i*4)));
     y += 27;
 
-    // ── ADD FOOTER TO ALL PAGES ──────────────────────────────────────────
     const total = doc.internal.getNumberOfPages();
     for (let p=1; p<=total; p++) {
       doc.setPage(p);
@@ -666,13 +605,9 @@ export default function ReportView({ report, lang="en", onBack }) {
   const handleDownload = () => {
     if (!data) return;
     setPdfLoading(true);
-    try {
-      generatePDF(data, fmtFull);
-    } catch(err) {
-      alert("PDF generation failed: " + err.message);
-    } finally {
-      setPdfLoading(false);
-    }
+    try { generatePDF(data, fmtFull); }
+    catch(err) { alert("PDF generation failed: " + err.message); }
+    finally { setPdfLoading(false); }
   };
 
   if (!data) return (
@@ -695,6 +630,9 @@ export default function ReportView({ report, lang="en", onBack }) {
     yellow: { bar:"bg-yellow-500",  text:"text-yellow-400",  border:"border-yellow-500/25",  bg:"bg-yellow-500/8"  },
     red:    { bar:"bg-red-500",     text:"text-red-400",     border:"border-red-500/25",     bg:"bg-red-500/8"     },
   }[data.bailColor];
+
+  // ── FIX: Get smart timeline display for UI ──
+  const { display: tlDisplay, isSevere } = formatTimeline(data.timeline);
 
   return (
     <div className="min-h-screen bg-[#08091a] pt-20 pb-16">
@@ -735,19 +673,24 @@ export default function ReportView({ report, lang="en", onBack }) {
               <p className="text-slate-300 text-sm font-semibold">{fmtFull(data.generatedAt)}</p>
             </div>
           </div>
+
+          {/* ── FIX: 4 stat cards — timeline uses tlDisplay, no hardcoded "months" ── */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             {[
-              {label:"Case Type",      value:data.caseType,             icon:<Gavel size={13}/>,    color:"text-white"},
-              {label:"Sections Found", value:`${data.sections.length}`, icon:<BookOpen size={13}/>, color:"text-white"},
-              {label:"Est. Timeline",  value:`${data.timeline} months`, icon:<Clock size={13}/>,    color:"text-white"},
-              {label:"Detention",      value:data.detentionLegal?"Within Limits":"Check Required", icon:<ShieldCheck size={13}/>, color:data.detentionLegal?"text-emerald-400":"text-red-400"},
+              { label:"Case Type",      value: data.caseType,              icon:<Gavel size={13}/>,      color:"text-white"          },
+              { label:"Sections Found", value: `${data.sections.length}`,  icon:<BookOpen size={13}/>,   color:"text-white"          },
+              { label:"Est. Timeline",  value: tlDisplay,                  icon:<Clock size={13}/>,      color: isSevere ? "text-red-400 font-bold" : "text-white" },
+              { label:"Detention",      value: data.detentionLegal ? "Within Limits" : "Check Required",
+                icon:<ShieldCheck size={13}/>,
+                color: data.detentionLegal ? "text-emerald-400" : "text-red-400" },
             ].map((item,i)=>(
-              <div key={i} className="bg-white/4 border border-white/8 rounded-xl p-3">
+              <div key={i} className={`bg-white/4 border rounded-xl p-3 ${i===2 && isSevere ? "border-red-500/25 bg-red-500/5" : "border-white/8"}`}>
                 <div className="flex items-center gap-1.5 text-slate-500 text-xs mb-1.5">{item.icon}<span>{item.label}</span></div>
-                <p className={`font-bold text-sm ${item.color}`}>{item.value}</p>
+                <p className={`font-bold text-sm leading-snug ${item.color}`}>{item.value}</p>
               </div>
             ))}
           </div>
+
           {data.inputQuery&&(
             <div className="bg-white/3 border border-white/8 rounded-xl px-4 py-3">
               <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Your Query</p>
@@ -795,11 +738,21 @@ export default function ReportView({ report, lang="en", onBack }) {
           </div>
         </div>
 
-        {/* Detention */}
+        {/* ── FIX: Detention + Timeline row — uses tlDisplay ── */}
         <div className={`rounded-2xl border p-4 flex items-center gap-3 ${data.detentionLegal?"border-emerald-500/20 bg-emerald-500/5":"border-red-500/20 bg-red-500/5"}`}>
           <ShieldCheck size={18} className={data.detentionLegal?"text-emerald-400 shrink-0":"text-red-400 shrink-0"}/>
-          <div><p className="text-white font-bold text-sm">Illegal Detention Check</p><p className={`text-xs mt-0.5 ${data.detentionLegal?"text-emerald-400":"text-red-400"}`}>{data.detentionLegal?"Detention appears within legal limits.":"Potential illegal detention — seek legal help immediately."}</p></div>
-          <div className="ml-auto text-right"><p className="text-slate-500 text-xs">Est. Timeline</p><p className="text-white font-bold text-sm">~{data.timeline} months</p></div>
+          <div>
+            <p className="text-white font-bold text-sm">Illegal Detention Check</p>
+            <p className={`text-xs mt-0.5 ${data.detentionLegal?"text-emerald-400":"text-red-400"}`}>
+              {data.detentionLegal?"Detention appears within legal limits.":"Potential illegal detention — seek legal help immediately."}
+            </p>
+          </div>
+          <div className="ml-auto text-right">
+            <p className="text-slate-500 text-xs">Est. Timeline</p>
+            {/* ── FIX: Show tlDisplay, color red if severe ── */}
+            <p className={`font-bold text-sm ${isSevere ? "text-red-400" : "text-white"}`}>{tlDisplay}</p>
+            {data.timelineNote && <p className="text-slate-500 text-[10px] mt-0.5">{data.timelineNote}</p>}
+          </div>
         </div>
 
         {/* Hearings + Rights */}
