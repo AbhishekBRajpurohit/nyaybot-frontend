@@ -49,16 +49,16 @@ export default function AuthModal({ onClose }) {
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-[#0c0f22] border border-white/10 rounded-3xl shadow-2xl shadow-black/60 overflow-hidden">
+      <div className="relative w-full max-w-md bg-[#0c0f22] border border-white/10 rounded-3xl shadow-2xl shadow-black/60 overflow-hidden max-h-[90vh] overflow-y-auto">
 
         {/* Top gradient bar */}
         <div className="h-1 w-full" style={{ background: "linear-gradient(90deg, #f59e0b, #fcd34d, #f59e0b)" }} />
 
-        <div className="p-8">
+        <div className="p-8 pt-10">
           {/* Close */}
-          <button onClick={onClose} className="absolute top-5 right-5 text-slate-500 hover:text-white transition-colors">
-            <X size={20} />
-          </button>
+          <button onClick={onClose} className="fixed top-5 right-5 z-[200] w-9 h-9 rounded-full bg-[#0c0f22] border border-white/20 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all shadow-lg">
+            <X size={18} />
+            </button>
 
           {/* Logo */}
           <div className="flex flex-col items-center mb-8">

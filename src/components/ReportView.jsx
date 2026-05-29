@@ -147,11 +147,39 @@ function parseReportData(aiText, inputText) {
   const summary = summaryMatch ? summaryMatch[1].trim()
     : `Case analysis complete. ${sections.length>0?`Charges: ${sections.map(s=>`${s.code} (${s.name})`).join(", ")}.`:""}  Please consult a qualified lawyer.`;
 
+  const lowerAI = (aiText||"").toLowerCase();
+  const lower = combined.toLowerCase();
+  const detentionPatterns = [
+    /illegal detention/,
+    /detained illegally/,
+    /unlawful detention/,
+    /not produced before a magistrate?/,
+    /not brought before magistrate/,
+    /without magistrate/,
+    /not produced within 24 hours/,
+    /detention beyond 24 hours/,
+    /over 24 hours/,
+    /more than 24 hours/,
+    /after 24 hours/,
+  ];
+  let detentionLegal = !detentionPatterns.some(rx => rx.test(lower));
+  const custodyMatch = lower.match(/(?:detained|in custody|police custody|held in custody|kept in custody)\s*(?:for|since)?\s*(\d+)\s*(hours?|hrs?|days?|weeks?|months?)/);
+  if (custodyMatch) {
+    const value = parseInt(custodyMatch[1], 10);
+    const unit = custodyMatch[2];
+    if (unit.startsWith("hour") || unit.startsWith("hr")) {
+      if (value > 24) detentionLegal = false;
+    } else {
+      detentionLegal = false;
+    }
+  }
+
+  if (/not produced (?:before )?magistrate/.test(lower)) detentionLegal = false;
+  if (/produced after.*24 hours/.test(lower)) detentionLegal = false;
+
   // ── Extract timeline from AI response ──────────────────────────────────
   let timeline = "18 months";
   let timelineNote = "";
-
-  const lowerAI = (aiText||"").toLowerCase();
 
   if (
     lowerAI.includes("life imprisonment") ||
@@ -203,7 +231,7 @@ function parseReportData(aiText, inputText) {
     aiText: aiText||"", summary, sections, bailPct,
     bailLabel: bailPct>=65?"Likely Granted":bailPct>=35?"Uncertain — Court Discretion":"Likely Denied",
     bailColor: bailPct>=65?"emerald":bailPct>=35?"yellow":"red",
-    detentionLegal:!combined.toLowerCase().includes("illegal detention"),
+    detentionLegal,
     timeline, timelineNote, rights, hearings, lawyers,
   };
 }
@@ -337,7 +365,7 @@ function generatePDF(data, fmtFull) {
       ["Case Type",      data.caseType],
       ["Sections Found", String(data.sections.length)],
       ["Est. Timeline",  tlDisplay],                    // ← FIXED: no hardcoded "months"
-      ["Detention",      data.detentionLegal ? "Within Limits" : "Check Required"],
+      ["Detention",      data.detentionLegal ? "Within Limits" : "Potentially Illegal"],
     ];
     const colW = cW / 4;
     ovCols.forEach(([label, val], i) => {
@@ -693,7 +721,7 @@ export default function ReportView({ report, lang="en", onBack }) {
               { label:"Case Type",      value: data.caseType,              icon:<Gavel size={13}/>,      color:"text-white"          },
               { label:"Sections Found", value: `${data.sections.length}`,  icon:<BookOpen size={13}/>,   color:"text-white"          },
               { label:"Est. Timeline",  value: tlDisplay,                  icon:<Clock size={13}/>,      color: isSevere ? "text-red-400 font-bold" : "text-white" },
-              { label:"Detention",      value: data.detentionLegal ? "Within Limits" : "Check Required",
+              { label:"Detention",      value: data.detentionLegal ? "Within Limits" : "Potentially Illegal",
                 icon:<ShieldCheck size={13}/>,
                 color: data.detentionLegal ? "text-emerald-400" : "text-red-400" },
             ].map((item,i)=>(
@@ -757,7 +785,7 @@ export default function ReportView({ report, lang="en", onBack }) {
           <div>
             <p className="text-white font-bold text-sm">Illegal Detention Check</p>
             <p className={`text-xs mt-0.5 ${data.detentionLegal?"text-emerald-400":"text-red-400"}`}>
-              {data.detentionLegal?"Detention appears within legal limits.":"Potential illegal detention — seek legal help immediately."}
+              {data.detentionLegal?"Detention appears within legal limits.":"Potential illegal detention - seek legal help immediately."}
             </p>
           </div>
           <div className="ml-auto text-right">
@@ -842,3 +870,4 @@ export default function ReportView({ report, lang="en", onBack }) {
     </div>
   );
 }
+

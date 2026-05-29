@@ -66,10 +66,10 @@ export function AuthProvider({ children }) {
   };
 
   // ── Google OAuth ───────────────────────────────────────────────────────
-  const loginWithGoogle = () => {
-    window.location.href = `${API}/auth/google`;
-  };
 
+const loginWithGoogle = () => {
+  window.location.href = `${API}/auth/google`;
+};
   // ── Logout ─────────────────────────────────────────────────────────────
   const logout = async () => {
     await fetch(`${API}/api/logout`, { method: "POST", credentials: "include" });

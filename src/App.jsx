@@ -60,7 +60,7 @@ export default function App() {
 
   // Navigate — if user not logged in and tries protected view, show auth modal
   const handleNavigate = (view) => {
-    const protectedViews = ["history", "alerts", "profile"];
+    const protectedViews = ["history", "alerts", "profile","report"];
     if (protectedViews.includes(view) && !user) {
       setShowAuth(true);
       return;
