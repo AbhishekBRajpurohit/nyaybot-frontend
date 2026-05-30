@@ -4,10 +4,10 @@ const AuthContext = createContext(null);
 const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
 export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null);   // { id, email, name, avatar, provider }
-  const [loading, setLoading] = useState(true);   // checking session on mount
+  const [user, setUser]       = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // ── Check existing session on page load ────────────────────────────────
+  // ── Check existing session on page load ──────────────────────────────
   useEffect(() => {
     fetch(`${API}/api/me`, { credentials: "include" })
       .then(r => r.json())
@@ -15,20 +15,42 @@ export function AuthProvider({ children }) {
       .catch(() => setLoading(false));
   }, []);
 
-  // ── Check for ?auth=success from Google OAuth redirect ─────────────────
+  // ── Check for ?auth=success from Google OAuth redirect ────────────────
+  // ✅ FIX: Added delay + retry logic so session cookie saves properly
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("auth") === "success") {
-      fetch(`${API}/api/me`, { credentials: "include" })
-        .then(r => r.json())
-        .then(data => {
-          setUser(data.user);
-          window.history.replaceState({}, "", window.location.pathname);
-        });
+      // Wait 500ms for session to save on server
+      setTimeout(() => {
+        fetch(`${API}/api/me`, { credentials: "include" })
+          .then(r => r.json())
+          .then(data => {
+            if (data.user) {
+              setUser(data.user);
+              window.history.replaceState({}, "", window.location.pathname);
+            } else {
+              // Try again after 1 more second
+              setTimeout(() => {
+                fetch(`${API}/api/me`, { credentials: "include" })
+                  .then(r => r.json())
+                  .then(d => {
+                    setUser(d.user);
+                    window.history.replaceState({}, "", window.location.pathname);
+                  })
+                  .catch(() => {});
+              }, 1000);
+            }
+          })
+          .catch(() => {});
+      }, 500);
+    }
+    if (params.get("auth") === "failed") {
+      console.error("Google login failed");
+      window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
 
-  // ── Register ───────────────────────────────────────────────────────────
+  // ── Register ──────────────────────────────────────────────────────────
   const register = async (email, password, name) => {
     const res = await fetch(`${API}/api/register`, {
       method: "POST",
@@ -42,7 +64,7 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
-  // ── Login ──────────────────────────────────────────────────────────────
+  // ── Login ─────────────────────────────────────────────────────────────
   const login = async (email, password) => {
     const res = await fetch(`${API}/api/login`, {
       method: "POST",
@@ -56,7 +78,7 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
-  // ── Refresh user from server ───────────────────────────────────────────
+  // ── Refresh user from server ──────────────────────────────────────────
   const refreshUser = async () => {
     try {
       const res = await fetch(`${API}/api/me`, { credentials: "include" });
@@ -65,12 +87,13 @@ export function AuthProvider({ children }) {
     } catch (_) {}
   };
 
-  // ── Google OAuth ───────────────────────────────────────────────────────
+  // ── Google OAuth ──────────────────────────────────────────────────────
+  // ✅ FIX: Direct to backend URL for Google OAuth
+  const loginWithGoogle = () => {
+    window.location.href = `${API}/auth/google`;
+  };
 
-const loginWithGoogle = () => {
-  window.location.href = `${API}/auth/google`;
-};
-  // ── Logout ─────────────────────────────────────────────────────────────
+  // ── Logout ────────────────────────────────────────────────────────────
   const logout = async () => {
     await fetch(`${API}/api/logout`, { method: "POST", credentials: "include" });
     setUser(null);
