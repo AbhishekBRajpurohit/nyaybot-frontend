@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
 
-const API = "http://localhost:4000";
+const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
 function getBailColor(pct) {
   if (pct >= 65) return { text: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/25" };

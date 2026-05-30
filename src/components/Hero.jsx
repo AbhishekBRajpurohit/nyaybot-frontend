@@ -372,7 +372,7 @@ export default function Hero({
 
       // Save to history (silently — only works if logged in)
       try {
-        await fetch("http://localhost:4000/api/history/save", {
+        await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:4000"}/api/history/save`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",

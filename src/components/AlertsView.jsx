@@ -6,7 +6,7 @@ import {
 import { useAuth } from "./AuthContext";
 import { useAlerts, getDaysUntilDate, fmtTime, fmtDate } from "./AlertsContext";
 
-const API = "http://localhost:4000";
+const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
 // ── Uses the fixed getDaysUntilDate (no UTC / midnight bug) ──────────────────
 function getUrgency(days, courtTime) {
