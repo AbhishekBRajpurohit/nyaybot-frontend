@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
 
-const API = "http://localhost:4000";
+const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
 // ── Mini sparkline SVG ────────────────────────────────────────────────────────
 function Sparkline() {
